@@ -1,0 +1,8 @@
+.*
+*.o
+*.a
+*.d
+*.img
+build/
+/fsimg/bin/
+/fsimg/dev/
