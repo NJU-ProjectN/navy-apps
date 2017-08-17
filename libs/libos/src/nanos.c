@@ -53,9 +53,13 @@ int _fstat(int fd, struct stat *buf) {
   return 0;
 }
 
-int _execve(const char *fname, char * const argv[], char *const envp[]) {
+int execve(const char *fname, char * const argv[], char *const envp[]) {
   assert(0);
   return -1;
+}
+
+int _execve(const char *fname, char * const argv[], char *const envp[]) {
+  return execve(fname, argv, envp);
 }
 
 int _kill(int pid, int sig) {
@@ -109,6 +113,31 @@ int _gettimeofday(struct timeval *tv) {
   assert(0);
   tv->tv_sec = 0;
   tv->tv_usec = 0;
+  return 0;
+}
+
+int _fcntl(int fd, int cmd, ... ) {
+  assert(0);
+  return 0;
+}
+
+int pipe(int pipefd[2]) {
+  assert(0);
+  return 0;
+}
+
+int dup(int oldfd) {
+  assert(0);
+  return 0;
+}
+
+int dup2(int oldfd, int newfd) {
+  assert(0);
+  return 0;
+}
+
+pid_t vfork(void) {
+  assert(0);
   return 0;
 }
 
