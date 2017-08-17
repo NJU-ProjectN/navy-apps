@@ -18,31 +18,31 @@ int _syscall_(int type, uintptr_t a0, uintptr_t a1, uintptr_t a2){
 }
 
 void _exit(int status) {
-  while (1);
+  _syscall_(SYS_exit, status, 0, 0);
 }
 
 int _open(const char *path, int flags, mode_t mode) {
-  while (1);
+  _exit(SYS_open);
 }
 
 int _write(int fd, void *buf, size_t count){
-  while (1);
+  _exit(SYS_write);
 }
 
 void *_sbrk(intptr_t increment){
-  while (1);
+  return (void *)-1;
 }
 
 int _read(int fd, void *buf, size_t count) {
-  while (1);
+  _exit(SYS_read);
 }
 
 int _close(int fd) {
-  while (1);
+  _exit(SYS_close);
 }
 
 off_t _lseek(int fd, off_t offset, int whence) {
-  while (1);
+  _exit(SYS_lseek);
 }
 
 // The code below is not used by Nanos-lite.
