@@ -27,6 +27,7 @@
 // Nanos
 #define PAL_PREFIX "/share/games/pal/"
 #define PAL_SAVE_PREFIX PAL_PREFIX
+#define PAL_LARGE static
 
 #ifdef __cplusplus
 extern "C"
@@ -223,10 +224,12 @@ typedef const CHAR         *LPCSTR;
 
 #endif
 
+#ifndef PAL_LARGE
 #if defined (__SYMBIAN32__)
 #	define PAL_LARGE           static
 #else
 #	define PAL_LARGE           /* */
+#endif
 #endif
 
 #ifdef __cplusplus
