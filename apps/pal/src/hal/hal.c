@@ -48,6 +48,7 @@ PAL_PollEvent(
       case NDL_SCANCODE_LEFT: key = K_LEFT; break;
       case NDL_SCANCODE_RIGHT: key = K_RIGHT; break;
       case NDL_SCANCODE_RETURN: key = K_RETURN; break;
+      case NDL_SCANCODE_SPACE: key = K_SPACE; break;
       case NDL_SCANCODE_ESCAPE: key = K_ESCAPE; break;
       case NDL_SCANCODE_PAGEUP: key = K_PAGEUP; break;
       case NDL_SCANCODE_PAGEDOWN: key = K_PAGEDOWN; break;
