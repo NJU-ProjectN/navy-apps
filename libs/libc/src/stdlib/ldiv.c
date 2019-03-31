@@ -1,43 +1,23 @@
 /*
- * ldiv.c
- * Original Author:	G. Haley
- *
- * Computes the quotient and remainder of the division of the numerator n by
- * the denominator d. If the division is inexact, the sign of the quotient is
- * that of the mathematical quotient, and the magnitude of the quotient is the
- * largest integer less than the magnitude of the mathematical quotient. If the
- * result cannot be represented, the behaviour is undefined. Returns the
- * results in a structure of type ldiv_t, comprising the following members:
- *
- *	long quot;
- *	long rem;
- */
-
-/*
 FUNCTION
 <<ldiv>>---divide two long integers
 
 INDEX
 	ldiv
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <stdlib.h>
 	ldiv_t ldiv(long <[n]>, long <[d]>);
-
-TRAD_SYNOPSIS
-	#include <stdlib.h>
-	ldiv_t ldiv(<[n]>, <[d]>)
-	long <[n]>, <[d]>;
 
 DESCRIPTION
 Divide
 @tex
 $n/d$,
 @end tex
-@ifinfo
+@ifnottex
 <[n]>/<[d]>,
-@end ifinfo
-returning quotient and remainder as two integers in a structure <<ldiv_t>>.
+@end ifnottex
+returning quotient and remainder as two long integers in a structure <<ldiv_t>>.
 
 RETURNS
 The result is represented with the structure
@@ -52,47 +32,72 @@ where the <<quot>> field represents the quotient, and <<rem>> the
 remainder.  For nonzero <[d]>, if `<<<[r]> = ldiv(<[n]>,<[d]>);>>' then
 <[n]> equals `<<<[r]>.rem + <[d]>*<[r]>.quot>>'.
 
-When <[d]> is zero, the <<quot>> member of the result has the same
-sign as <[n]> and the largest representable magnitude.
-
 To divide <<int>> rather than <<long>> values, use the similar
 function <<div>>.
 
 PORTABILITY
-<<ldiv>> is ANSI, but the behavior for zero <[d]> is not specified by
-the standard.
+<<ldiv>> is ANSI.
 
 No supporting OS subroutines are required.
 */
 
-#include <limits.h>
-#include <stdlib.h>
 
-ldiv_t 
-ldiv (n, d)
-     long n, d;
+/*
+ * Copyright (c) 1990 Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Chris Torek.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the University of
+ *	California, Berkeley and its contributors.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#include <_ansi.h>
+#include <stdlib.h>		/* ldiv_t */
+
+ldiv_t
+ldiv (long num,
+        long denom)
 {
-  ldiv_t res;
+	ldiv_t r;
 
-  if (d)
-    {
-      res.quot = labs (n) / labs (d);
-      res.rem = labs (n) % labs (d);
+	/* see div.c for comments */
 
-      if ((n < 0 && d > 0) || (n >= 0 && d < 0))
-	res.quot = -res.quot;
-      if (n < 0)
-	res.rem = -res.rem;
-    }
-  else
-    {
-      if (n < 0)
-	res.quot = LONG_MIN;
-      else
-	res.quot = LONG_MAX;
-
-      res.rem = 0;
-    }
-
-  return res;
+	r.quot = num / denom;
+	r.rem = num % denom;
+	if (num >= 0 && r.rem < 0) {
+		++r.quot;
+		r.rem -= denom;
+	}
+	else if (num < 0 && r.rem > 0) {
+		--r.quot;
+		r.rem += denom;
+	}
+	return (r);
 }

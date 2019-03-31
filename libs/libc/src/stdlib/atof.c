@@ -7,25 +7,17 @@ INDEX
 INDEX
 	atoff
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <stdlib.h>
         double atof(const char *<[s]>);
         float atoff(const char *<[s]>);
-
-TRAD_SYNOPSIS
-	#include <stdlib.h>
-        double atof(<[s]>)
-        char *<[s]>;
-
-        float atoff(<[s]>)
-        char *<[s]>;
 
 DESCRIPTION
 <<atof>> converts the initial portion of a string to a <<double>>.
 <<atoff>> converts the initial portion of a string to a <<float>>.
 
 The functions parse the character string <[s]>,
-locating a substring which can be converted to a floating point
+locating a substring which can be converted to a floating-point
 value. The substring must match the format:
 . [+|-]<[digits]>[.][<[digits]>][(e|E)[+|-]<[digits]>]
 The substring converted is the longest initial
@@ -36,7 +28,7 @@ of whitespace, or if the first non-whitespace character is
 something other than <<+>>, <<->>, <<.>>, or a digit.
 
 <<atof(<[s]>)>> is implemented as <<strtod(<[s]>, NULL)>>.
-<<atoff(<[s]>)>> is implemented as <<strtodf(<[s]>, NULL)>>.
+<<atoff(<[s]>)>> is implemented as <<strtof(<[s]>, NULL)>>.
 
 RETURNS
 <<atof>> returns the converted substring value, if any, as a
@@ -65,15 +57,7 @@ Supporting OS subroutines required: <<close>>, <<fstat>>, <<isatty>>,
 #include <_ansi.h>
 
 double
-_DEFUN (atof, (s),
-	_CONST char *s)
+atof (const char *s)
 {
   return strtod (s, NULL);
-}
-
-float
-_DEFUN (atoff, (s),
-	_CONST char *s)
-{
-  return strtodf (s, NULL);
 }

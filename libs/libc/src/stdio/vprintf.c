@@ -1,5 +1,3 @@
-/* doc in vfprintf.c */
-
 /*
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -16,20 +14,44 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+/* doc in vfprintf.c */
 
 #include <_ansi.h>
+#include <reent.h>
 #include <stdio.h>
-
-#ifdef _HAVE_STDC
 #include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
+#include "local.h"
+
+#ifndef _REENT_ONLY
 
 int
-vprintf (fmt, ap)
-     char _CONST *fmt;
-     va_list ap;
+vprintf (const char *fmt,
+       va_list ap)
 {
-  return vfprintf (stdout, fmt, ap);
+  struct _reent *reent = _REENT;
+
+  _REENT_SMALL_CHECK_INIT (reent);
+  return _vfprintf_r (reent, _stdout_r (reent), fmt, ap);
 }
+
+#ifdef _NANO_FORMATTED_IO
+int
+viprintf (const char *, __VALIST) _ATTRIBUTE ((__alias__("vprintf")));
+#endif
+
+#endif /* !_REENT_ONLY */
+
+int
+_vprintf_r (struct _reent *ptr,
+       const char *__restrict fmt,
+       va_list ap)
+{
+  _REENT_SMALL_CHECK_INIT (ptr);
+  return _vfprintf_r (ptr, _stdout_r (ptr), fmt, ap);
+}
+
+#ifdef _NANO_FORMATTED_IO
+int
+_viprintf_r (struct _reent *, const char *, __VALIST)
+       _ATTRIBUTE ((__alias__("_vprintf_r")));
+#endif

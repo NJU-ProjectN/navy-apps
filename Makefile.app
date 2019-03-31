@@ -53,5 +53,5 @@ else
 	$(error Cannot run: should be loaded by an OS)
 endif
 
-clean: 
+clean:
 	rm -rf $(APP_DIR)/build/

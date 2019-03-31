@@ -1,20 +1,13 @@
 /*
 FUNCTION
-<<assert>>---Macro for Debugging Diagnostics
+<<assert>>---macro for debugging diagnostics
 
 INDEX
 	assert
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <assert.h>
-	#include <stdlib.h>
 	void assert(int <[expression]>);
-
-TRAD_SYNOPSIS
-	#include <assert.h>
-	#include <stdlib.h>
-	assert(<[expression]>)
-	int <[expression]>;
 
 DESCRIPTION
 	Use this macro to embed debuggging diagnostic statements in
@@ -26,7 +19,11 @@ DESCRIPTION
 	calls <<abort>>, after first printing a message showing what
 	failed and where:
 
-. Assertion failed: <[expression]>, file <[filename]>, line <[lineno]>
+. Assertion failed: <[expression]>, file <[filename]>, line <[lineno]>, function: <[func]>
+
+	If the name of the current function is not known (for example,
+	when using a C89 compiler that does not understand __func__),
+	the function location is omitted.
 
 	The macro is defined to permit you to turn off all uses of
 	<<assert>> at compile time by defining <<NDEBUG>> as a
@@ -50,13 +47,28 @@ Supporting OS subroutines required (only if enabled): <<close>>, <<fstat>>,
 #include <stdlib.h>
 #include <stdio.h>
 
-int
-_DEFUN (__assertfail, (string, cond, file, line),
-	char *string _AND
-	char *cond _AND
-	char *file _AND
-	int line)
+#ifndef HAVE_ASSERT_FUNC
+/* func can be NULL, in which case no function information is given.  */
+void
+__assert_func (const char *file,
+	int line,
+	const char *func,
+	const char *failedexpr)
 {
-  fprintf (stderr, string, cond, file, line);
-  abort ();
+  fiprintf(stderr,
+	   "assertion \"%s\" failed: file \"%s\", line %d%s%s\n",
+	   failedexpr, file, line,
+	   func ? ", function: " : "", func ? func : "");
+  abort();
+  /* NOTREACHED */
+}
+#endif /* HAVE_ASSERT_FUNC */
+
+void
+__assert (const char *file,
+	int line,
+	const char *failedexpr)
+{
+   __assert_func (file, line, NULL, failedexpr);
+  /* NOTREACHED */
 }

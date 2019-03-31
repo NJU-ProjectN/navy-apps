@@ -15,13 +15,9 @@ FUNCTION
 INDEX
 	abort
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <stdlib.h>
 	void abort(void);
-
-TRAD_SYNOPSIS
-	#include <stdlib.h>
-	void abort();
 
 DESCRIPTION
 Use <<abort>> to signal that your program has detected a condition it
@@ -43,15 +39,20 @@ RETURNS
 PORTABILITY
 ANSI C requires <<abort>>.
 
-Supporting OS subroutines required: <<getpid>>, <<kill>>.
+Supporting OS subroutines required: <<_exit>> and optionally, <<write>>.
 */
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <signal.h>
 
-_VOID
-_DEFUN_VOID (abort)
+void
+abort (void)
 {
+#ifdef ABORT_MESSAGE
+  write (2, "Abort called\n", sizeof ("Abort called\n")-1);
+#endif
+
   while (1)
     {
       raise (SIGABRT);

@@ -14,11 +14,55 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+/*
+FUNCTION
+<<ungetc>>---push data back into a stream
+
+INDEX
+	ungetc
+INDEX
+	_ungetc_r
+
+SYNOPSIS
+	#include <stdio.h>
+	int ungetc(int <[c]>, FILE *<[stream]>);
+
+	int _ungetc_r(struct _reent *<[reent]>, int <[c]>, FILE *<[stream]>);
+
+DESCRIPTION
+<<ungetc>> is used to return bytes back to <[stream]> to be read again.
+If <[c]> is EOF, the stream is unchanged.  Otherwise, the unsigned
+char <[c]> is put back on the stream, and subsequent reads will see
+the bytes pushed back in reverse order.  Pushed byes are lost if the
+stream is repositioned, such as by <<fseek>>, <<fsetpos>>, or
+<<rewind>>.
+
+The underlying file is not changed, but it is possible to push back
+something different than what was originally read.  Ungetting a
+character will clear the end-of-stream marker, and decrement the file
+position indicator.  Pushing back beyond the beginning of a file gives
+unspecified behavior.
+
+The alternate function <<_ungetc_r>> is a reentrant version.  The
+extra argument <[reent]> is a pointer to a reentrancy structure.
+
+RETURNS
+The character pushed back, or <<EOF>> on error.
+
+PORTABILITY
+ANSI C requires <<ungetc>>, but only requires a pushback buffer of one
+byte; although this implementation can handle multiple bytes, not all
+can.  Pushing back a signed char is a common application bug.
+
+Supporting OS subroutines required: <<sbrk>>.
+*/
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "%W% (Berkeley) %G%";
 #endif /* LIBC_SCCS and not lint */
 
+#include <_ansi.h>
+#include <reent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,8 +77,8 @@ static char sccsid[] = "%W% (Berkeley) %G%";
 
 /*static*/
 int
-__submore (fp)
-     register FILE *fp;
+__submore (struct _reent *rptr,
+       register FILE *fp)
 {
   register int i;
   register unsigned char *p;
@@ -44,7 +88,7 @@ __submore (fp)
       /*
        * Get a new buffer (rather than expanding the old one).
        */
-      if ((p = (unsigned char *) _malloc_r (fp->_data, (size_t) BUFSIZ)) == NULL)
+      if ((p = (unsigned char *) _malloc_r (rptr, (size_t) BUFSIZ)) == NULL)
 	return EOF;
       fp->_ub._base = p;
       fp->_ub._size = BUFSIZ;
@@ -55,7 +99,7 @@ __submore (fp)
       return 0;
     }
   i = fp->_ub._size;
-  p = (unsigned char *) _realloc_r (fp->_data, (_PTR) (fp->_ub._base), i << 1);
+  p = (unsigned char *) _realloc_r (rptr, (void *) (fp->_ub._base), i << 1);
   if (p == NULL)
     return EOF;
   (void) memcpy ((void *) (p + i), (void *) p, (size_t) i);
@@ -66,9 +110,9 @@ __submore (fp)
 }
 
 int
-ungetc (c, fp)
-     int c;
-     register FILE *fp;
+_ungetc_r (struct _reent *rptr,
+       int c,
+       register FILE *fp)
 {
   if (c == EOF)
     return (EOF);
@@ -77,7 +121,11 @@ ungetc (c, fp)
      ??? Might be able to remove this as some other stdio routine should
      have already been called to get the char we are un-getting.  */
 
-  CHECK_INIT (fp);
+  CHECK_INIT (rptr, fp);
+
+  _newlib_flockfile_start (fp);
+
+  ORIENT (fp, -1);
 
   /* After ungetc, we won't be at eof anymore */
   fp->_flags &= ~__SEOF;
@@ -89,11 +137,17 @@ ungetc (c, fp)
        * Otherwise, flush any current write stuff.
        */
       if ((fp->_flags & __SRW) == 0)
-	return EOF;
+        {
+          _newlib_flockfile_exit (fp);
+          return EOF;
+        }
       if (fp->_flags & __SWR)
 	{
-	  if (fflush (fp))
-	    return EOF;
+	  if (_fflush_r (rptr, fp))
+            {
+              _newlib_flockfile_exit (fp);
+              return EOF;
+            }
 	  fp->_flags &= ~__SWR;
 	  fp->_w = 0;
 	  fp->_lbfsize = 0;
@@ -109,10 +163,14 @@ ungetc (c, fp)
 
   if (HASUB (fp))
     {
-      if (fp->_r >= fp->_ub._size && __submore (fp))
-	return EOF;
+      if (fp->_r >= fp->_ub._size && __submore (rptr, fp))
+        {
+          _newlib_flockfile_exit (fp);
+          return EOF;
+        }
       *--fp->_p = c;
       fp->_r++;
+      _newlib_flockfile_exit (fp);
       return c;
     }
 
@@ -126,6 +184,7 @@ ungetc (c, fp)
     {
       fp->_p--;
       fp->_r++;
+      _newlib_flockfile_exit (fp);
       return c;
     }
 
@@ -141,5 +200,15 @@ ungetc (c, fp)
   fp->_ubuf[sizeof (fp->_ubuf) - 1] = c;
   fp->_p = &fp->_ubuf[sizeof (fp->_ubuf) - 1];
   fp->_r = 1;
+  _newlib_flockfile_end (fp);
   return c;
 }
+
+#ifndef _REENT_ONLY
+int
+ungetc (int c,
+       register FILE *fp)
+{
+  return _ungetc_r (_REENT, c, fp);
+}
+#endif /* !_REENT_ONLY */

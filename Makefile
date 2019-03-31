@@ -1,16 +1,18 @@
 include Makefile.check
 
-APPS = $(dir $(shell find apps tests -mindepth 2 -name "Makefile"))
+APPS = init pal litenes
+TESTS = bmp dummy events hello text
 
-.PHONY: fsimg $(APPS) $(LIBS) clean
+APPS_ALL = $(addprefix $(NAVY_HOME)/apps/, $(APPS)) $(addprefix $(NAVY_HOME)/tests/, $(TESTS))
 
-fsimg: $(APPS)
+.PHONY: fsimg $(APPS_ALL) clean
 
-$(APPS): %: $(LIBS)
+fsimg: $(APPS_ALL)
+
+$(APPS_ALL): %:
 	-$(MAKE) -C $@ install
 
 clean:
-	$(foreach app, $(shell ls apps/), $(MAKE) -C $(NAVY_HOME)/apps/$(app) clean ;)
+	$(foreach app, $(APPS_ALL), $(MAKE) -C $(app) clean ;)
 	$(foreach lib, $(shell ls libs/), $(MAKE) -C $(NAVY_HOME)/libs/$(lib) clean ;)
-	$(foreach test, $(shell ls tests/), $(MAKE) -C $(NAVY_HOME)/tests/$(test) clean ;)
 	rm -f fsimg/bin/*

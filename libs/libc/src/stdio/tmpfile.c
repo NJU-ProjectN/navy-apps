@@ -7,18 +7,11 @@ INDEX
 INDEX
 	_tmpfile_r
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <stdio.h>
 	FILE *tmpfile(void);
 
-	FILE *_tmpfile_r(void *<[reent]>);
-
-TRAD_SYNOPSIS
-	#include <stdio.h>
-	FILE *tmpfile();
-
-	FILE *_tmpfile_r(<[reent]>)
-	char *<[reent]>;
+	FILE *_tmpfile_r(struct _reent *<[reent]>);
 
 DESCRIPTION
 Create a temporary file (a file which will be deleted automatically),
@@ -45,23 +38,41 @@ Supporting OS subroutines required: <<close>>, <<fstat>>, <<getpid>>,
 <<tmpfile>> also requires the global pointer <<environ>>.
 */
 
+#include <_ansi.h>
+#include <reent.h>
 #include <stdio.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+#ifndef O_BINARY
+# define O_BINARY 0
+#endif
 
 FILE *
-_DEFUN (_tmpfile_r, (ptr),
-	struct _reent *ptr)
+_tmpfile_r (struct _reent *ptr)
 {
   FILE *fp;
   int e;
   char *f;
   char buf[L_tmpnam];
+  int fd;
 
-  if ((f = _tmpnam_r (ptr, buf)) == NULL)
+  do
+    {
+      if ((f = _tmpnam_r (ptr, buf)) == NULL)
+	return NULL;
+      fd = _open_r (ptr, f, O_RDWR | O_CREAT | O_EXCL | O_BINARY,
+		    S_IRUSR | S_IWUSR);
+    }
+  while (fd < 0 && ptr->_errno == EEXIST);
+  if (fd < 0)
     return NULL;
-  fp = fopen (f, "wb+");
+  fp = _fdopen_r (ptr, fd, "wb+");
   e = ptr->_errno;
-  _CAST_VOID remove (f);
+  if (!fp)
+    _close_r (ptr, fd);
+  (void) _remove_r (ptr, f);
   ptr->_errno = e;
   return fp;
 }
@@ -69,7 +80,7 @@ _DEFUN (_tmpfile_r, (ptr),
 #ifndef _REENT_ONLY
 
 FILE *
-_DEFUN_VOID (tmpfile)
+tmpfile (void)
 {
   return _tmpfile_r (_REENT);
 }

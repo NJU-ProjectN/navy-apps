@@ -5,15 +5,9 @@ FUNCTION
 INDEX
 	rindex
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <string.h>
 	char * rindex(const char *<[string]>, int <[c]>);
-
-TRAD_SYNOPSIS
-	#include <string.h>
-	char * rindex(<[string]>, <[c]>);
-	char *<[string]>;
-	int *<[c]>;
 
 DESCRIPTION
 	This function finds the last occurence of <[c]> (converted to
@@ -34,10 +28,10 @@ QUICKREF
 */
 
 #include <string.h>
+#include <strings.h>
 
 char *
-_DEFUN (rindex, (s, c),
-	_CONST char *s _AND
+rindex (const char *s,
 	int c)
 {
   return strrchr (s, c);

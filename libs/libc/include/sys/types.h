@@ -15,94 +15,232 @@
    doesn't have a stat, and the necv70 doesn't matter.) -- eichin
  */
 
-#ifndef	_SYS_TYPES_H
-# define	_SYS_TYPES_H
+#ifndef _SYS_TYPES_H
 
-#ifdef __i386__
-#ifndef __unix__
-#define __go32_types__
+#include <_ansi.h>
+#include <sys/cdefs.h>
+#include <machine/_types.h>
+
+/* BSD types permitted by POSIX and always exposed as in Glibc.  Only provided
+   for backward compatibility with BSD code.  The uintN_t standard types should
+   be preferred in new code. */
+#if ___int8_t_defined
+typedef __uint8_t	u_int8_t;
 #endif
+#if ___int16_t_defined
+typedef __uint16_t	u_int16_t;
+#endif 
+#if ___int32_t_defined
+typedef __uint32_t	u_int32_t;
+#endif
+#if ___int64_t_defined
+typedef __uint64_t	u_int64_t;
+#endif
+typedef int register_t;
+#define __BIT_TYPES_DEFINED__ 1
+
+#if defined(__rtems__) || defined(__XMK__)
+/*
+ *  The following section is RTEMS specific and is needed to more
+ *  closely match the types defined in the BSD sys/types.h.
+ *  This is needed to let the RTEMS/BSD TCP/IP stack compile.
+ */
+
+/* deprecated */
+#if ___int64_t_defined
+typedef	__uint64_t	u_quad_t;
+typedef	__int64_t	quad_t;
+typedef	quad_t *	qaddr_t;
 #endif
 
-# include <stddef.h>	
-# include <machine/types.h>
+#endif /* __rtems__ || __XMK__ */
 
-# ifndef	_POSIX_SOURCE
+#ifndef __need_inttypes
 
+#define _SYS_TYPES_H
+/* <stddef.h> must be before <sys/_types.h> for __size_t considerations */
+#include <stddef.h>
+#include <sys/_types.h>
+#include <sys/_stdint.h>
+
+#if __BSD_VISIBLE
+#include <machine/endian.h>
+#include <sys/select.h>
 #  define	physadr		physadr_t
 #  define	quad		quad_t
 
+#ifndef _IN_ADDR_T_DECLARED
+typedef	__uint32_t	in_addr_t;	/* base type for internet address */
+#define	_IN_ADDR_T_DECLARED
+#endif
+
+#ifndef _IN_PORT_T_DECLARED
+typedef	__uint16_t	in_port_t;
+#define	_IN_PORT_T_DECLARED
+#endif
+#endif /* __BSD_VISIBLE */
+
+#if __MISC_VISIBLE
+#ifndef _BSDTYPES_DEFINED
+/* also defined in mingw/gmon.h and in w32api/winsock[2].h */
+#ifndef __u_char_defined
 typedef	unsigned char	u_char;
+#define __u_char_defined
+#endif
+#ifndef __u_short_defined
 typedef	unsigned short	u_short;
+#define __u_short_defined
+#endif
+#ifndef __u_int_defined
 typedef	unsigned int	u_int;
+#define __u_int_defined
+#endif
+#ifndef __u_long_defined
 typedef	unsigned long	u_long;
+#define __u_long_defined
+#endif
+#define _BSDTYPES_DEFINED
+#endif
+#endif	/*__BSD_VISIBLE || __CYGWIN__ */
+
+#if __MISC_VISIBLE
 typedef	unsigned short	ushort;		/* System V compatibility */
 typedef	unsigned int	uint;		/* System V compatibility */
-# endif	/*!_POSIX_SOURCE */
-
-#ifndef __time_t_defined
-typedef _TIME_T_ time_t;
-#define __time_t_defined
+typedef	unsigned long	ulong;		/* System V compatibility */
 #endif
 
+#ifndef _BLKCNT_T_DECLARED
+typedef	__blkcnt_t	blkcnt_t;
+#define	_BLKCNT_T_DECLARED
+#endif
+
+#ifndef _BLKSIZE_T_DECLARED
+typedef	__blksize_t	blksize_t;
+#define	_BLKSIZE_T_DECLARED
+#endif
+
+#if !defined(__clock_t_defined) && !defined(_CLOCK_T_DECLARED)
+typedef	_CLOCK_T_	clock_t;
+#define	__clock_t_defined
+#define	_CLOCK_T_DECLARED
+#endif
+
+#if !defined(__time_t_defined) && !defined(_TIME_T_DECLARED)
+typedef	_TIME_T_	time_t;
+#define	__time_t_defined
+#define	_TIME_T_DECLARED
+#endif
+
+#ifndef __daddr_t_defined
 typedef	long	daddr_t;
+#define __daddr_t_defined
+#endif
+#ifndef __caddr_t_defined
 typedef	char *	caddr_t;
-#ifdef __go32_types__
-typedef	unsigned long	ino_t;
-#else
-#ifdef __sparc__
-typedef	unsigned long	ino_t;
-#else
-typedef	unsigned short	ino_t;
-#endif
-#endif
-typedef	short	dev_t;
-typedef	long	off_t;
-typedef long  ssize_t;
-typedef	unsigned short	uid_t;
-typedef	unsigned short	gid_t;
-typedef	long	key_t;
-#ifdef __go32_types__
-typedef	char *	addr_t;
-typedef int mode_t;
-#else
-#ifdef __sparc__
-typedef unsigned short mode_t;
-#else
-typedef unsigned mode_t;
-#endif
+#define __caddr_t_defined
 #endif
 
-# ifndef	_POSIX_SOURCE
+#ifndef _FSBLKCNT_T_DECLARED		/* for statvfs() */
+typedef	__fsblkcnt_t	fsblkcnt_t;
+typedef	__fsfilcnt_t	fsfilcnt_t;
+#define	_FSBLKCNT_T_DECLARED
+#endif
 
-#  define	NBBY	8		/* number of bits in a byte */
+#ifndef _ID_T_DECLARED
+typedef	__id_t		id_t;		/* can hold a uid_t or pid_t */
+#define	_ID_T_DECLARED
+#endif
+
+#ifndef _INO_T_DECLARED
+typedef	__ino_t		ino_t;		/* inode number */
+#define	_INO_T_DECLARED
+#endif
+
+#if defined(__i386__) && (defined(GO32) || defined(__MSDOS__))
+typedef	char *		addr_t;
+typedef unsigned long vm_offset_t;
+typedef unsigned long vm_size_t;
+#endif /* __i386__ && (GO32 || __MSDOS__) */
+
 /*
- * Select uses bit masks of file descriptors in longs.
- * These macros manipulate such bit fields (the filesystem macros use chars).
- * FD_SETSIZE may be defined by the user, but the default here
- * should be >= NOFILE (param.h).
+ * All these should be machine specific - right now they are all broken.
+ * However, for all of Cygnus' embedded targets, we want them to all be
+ * the same.  Otherwise things like sizeof (struct stat) might depend on
+ * how the file was compiled (e.g. -mint16 vs -mint32, etc.).
  */
-#  ifndef	FD_SETSIZE
-#	define	FD_SETSIZE	60
-#  endif
 
-typedef	long	fd_mask;
-#  define	NFDBITS	(sizeof (fd_mask) * NBBY)	/* bits per mask */
-#  ifndef	howmany
-#	define	howmany(x,y)	(((x)+((y)-1))/(y))
-#  endif
+#ifndef _OFF_T_DECLARED
+typedef	__off_t		off_t;		/* file offset */
+#define	_OFF_T_DECLARED
+#endif
+#ifndef _DEV_T_DECLARED
+typedef	__dev_t		dev_t;		/* device number or struct cdev */
+#define	_DEV_T_DECLARED
+#endif
+#ifndef _UID_T_DECLARED
+typedef	__uid_t		uid_t;		/* user id */
+#define	_UID_T_DECLARED
+#endif
+#ifndef _GID_T_DECLARED
+typedef	__gid_t		gid_t;		/* group id */
+#define	_GID_T_DECLARED
+#endif
 
-typedef	struct fd_set {
-	fd_mask	fds_bits[howmany(FD_SETSIZE, NFDBITS)];
-} fd_set;
+#ifndef _PID_T_DECLARED
+typedef	__pid_t		pid_t;		/* process id */
+#define	_PID_T_DECLARED
+#endif
 
+#ifndef _KEY_T_DECLARED
+typedef	__key_t		key_t;		/* IPC key */
+#define	_KEY_T_DECLARED
+#endif
 
-#  define	FD_SET(n, p)	((p)->fds_bits[(n)/NFDBITS] |= (1L << ((n) % NFDBITS)))
-#  define	FD_CLR(n, p)	((p)->fds_bits[(n)/NFDBITS] &= ~(1L << ((n) % NFDBITS)))
-#  define	FD_ISSET(n, p)	((p)->fds_bits[(n)/NFDBITS] & (1L << ((n) % NFDBITS)))
-#  define	FD_ZERO(p)	bzero((caddr_t)(p), sizeof (*(p)))
+#ifndef _SSIZE_T_DECLARED
+typedef _ssize_t ssize_t;
+#define	_SSIZE_T_DECLARED
+#endif
 
+#ifndef _MODE_T_DECLARED
+typedef	__mode_t	mode_t;		/* permissions */
+#define	_MODE_T_DECLARED
+#endif
 
-# endif	/* _POSIX_SOURCE */
-#undef __go32_types__
+#ifndef _NLINK_T_DECLARED
+typedef	__nlink_t	nlink_t;	/* link count */
+#define	_NLINK_T_DECLARED
+#endif
+
+#if !defined(__clockid_t_defined) && !defined(_CLOCKID_T_DECLARED)
+typedef	__clockid_t	clockid_t;
+#define	__clockid_t_defined
+#define	_CLOCKID_T_DECLARED
+#endif
+
+#if !defined(__timer_t_defined) && !defined(_TIMER_T_DECLARED)
+typedef	__timer_t	timer_t;
+#define	__timer_t_defined
+#define	_TIMER_T_DECLARED
+#endif
+
+#ifndef _USECONDS_T_DECLARED
+typedef	__useconds_t	useconds_t;	/* microseconds (unsigned) */
+#define	_USECONDS_T_DECLARED
+#endif
+
+#ifndef _SUSECONDS_T_DECLARED
+typedef	__suseconds_t	suseconds_t;
+#define	_SUSECONDS_T_DECLARED
+#endif
+
+typedef	__int64_t	sbintime_t;
+
+#include <sys/features.h>
+#include <sys/_pthreadtypes.h>
+#include <machine/types.h>
+
+#endif  /* !__need_inttypes */
+
+#undef __need_inttypes
+
 #endif	/* _SYS_TYPES_H */

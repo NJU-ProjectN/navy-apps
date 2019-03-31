@@ -1,8 +1,3 @@
-/* This file may have been modified by DJ Delorie (Jan 1991).  If so,
-** these modifications are Coyright (C) 1991 DJ Delorie, 24 Kirsten Ave,
-** Rochester NH, 03867-2954, USA.
-*/
-
 /*
  * Copyright (c) 1987 Regents of the University of California.
  * All rights reserved.
@@ -22,13 +17,13 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#ifndef _REENT_ONLY
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* _findenv is defined in getenv.c.  */
-
-extern char *_findenv _PARAMS ((const char *, int *));
+extern int _unsetenv_r (struct _reent *, const char *);
 
 /*
  * setenv --
@@ -37,78 +32,21 @@ extern char *_findenv _PARAMS ((const char *, int *));
  */
 
 int
-_DEFUN (setenv, (name, value, rewrite),
-	_CONST char *name _AND
-	_CONST char *value _AND
+setenv (const char *name,
+	const char *value,
 	int rewrite)
 {
-  extern char **environ;
-  static int alloced;		/* if allocated space before */
-  register char *C;
-  int l_value, offset;
-
-  if (*value == '=')		/* no `=' in value */
-    ++value;
-  l_value = strlen (value);
-  if ((C = _findenv (name, &offset)))
-    {				/* find if already exists */
-      if (!rewrite)
-	return 0;
-      if (strlen (C) >= l_value)
-	{			/* old larger; copy over */
-	  while (*C++ = *value++);
-	  return 0;
-	}
-    }
-  else
-    {				/* create new slot */
-      register int cnt;
-      register char **P;
-
-      for (P = environ, cnt = 0; *P; ++P, ++cnt);
-      if (alloced)
-	{			/* just increase size */
-	  environ = (char **) realloc ((char *) environ,
-				       (size_t) (sizeof (char *) * (cnt + 2)));
-	  if (!environ)
-	    return -1;
-	}
-      else
-	{			/* get new space */
-	  alloced = 1;		/* copy old entries into it */
-	  P = (char **) malloc ((size_t) (sizeof (char *) * (cnt + 2)));
-	  if (!P)
-	    return (-1);
-	  bcopy ((char *) environ, (char *) P, cnt * sizeof (char *));
-	  environ = P;
-	}
-      environ[cnt + 1] = NULL;
-      offset = cnt;
-    }
-  for (C = (char *) name; *C && *C != '='; ++C);	/* no `=' in name */
-  if (!(environ[offset] =	/* name + `=' + value */
-	malloc ((size_t) ((int) (C - name) + l_value + 2))))
-    return -1;
-  for (C = environ[offset]; (*C = *name++) && *C != '='; ++C);
-  for (*C++ = '='; *C++ = *value++;);
-  return 0;
+  return _setenv_r (_REENT, name, value, rewrite);
 }
 
 /*
  * unsetenv(name) --
  *	Delete environmental variable "name".
  */
-
-void
-unsetenv (name)
-     char *name;
+int
+unsetenv (const char *name)
 {
-  extern char **environ;
-  register char **P;
-  int offset;
-
-  while (_findenv (name, &offset))	/* if set multiple times */
-    for (P = &environ[offset];; ++P)
-      if (!(*P = *(P + 1)))
-	break;
+  return _unsetenv_r (_REENT, name);
 }
+
+#endif /* !_REENT_ONLY */

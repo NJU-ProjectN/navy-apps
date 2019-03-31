@@ -3,6 +3,7 @@
 
 #include <reent.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <_syslist.h>
 
 /* Some targets provides their own versions of these functions.  Those
@@ -23,7 +24,7 @@ int _dummy_stat_syscalls = 1;
 
 /* We use the errno variable used by the system dependent layer.  */
 #undef errno
-int errno;
+extern int errno;
 
 /*
 FUNCTION
@@ -32,17 +33,10 @@ FUNCTION
 INDEX
 	_stat_r
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <reent.h>
 	int _stat_r(struct _reent *<[ptr]>,
 		    const char *<[file]>, struct stat *<[pstat]>);
-
-TRAD_SYNOPSIS
-	#include <reent.h>
-	int _stat_r(<[ptr]>, <[file]>, <[pstat]>)
-	struct _reent *<[ptr]>;
-	char *<[file]>;
-	struct stat *<[pstat]>;
 
 DESCRIPTION
 	This is a reentrant version of <<stat>>.  It
@@ -51,16 +45,14 @@ DESCRIPTION
 */
 
 int
-_stat_r (ptr, file, pstat)
-     struct _reent *ptr;
-     _CONST char *file;
-     struct stat *pstat;
+_stat_r (struct _reent *ptr,
+     const char *file,
+     struct stat *pstat)
 {
   int ret;
 
   errno = 0;
-  ret = _stat (file, pstat);
-  if (errno != 0)
+  if ((ret = _stat (file, pstat)) == -1 && errno != 0)
     ptr->_errno = errno;
   return ret;
 }

@@ -3,6 +3,7 @@
 
 #include <reent.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include <_syslist.h>
 
 /* Some targets provides their own versions of these functions.  Those
@@ -24,23 +25,51 @@ int _dummy_exec_syscalls = 1;
 
 /* We use the errno variable used by the system dependent layer.  */
 #undef errno
-int errno;
+extern int errno;
 
 /*
+FUNCTION
+	<<_execve_r>>---Reentrant version of execve	
+INDEX
+	_execve_r
+
+SYNOPSIS
+	#include <reent.h>
+	int _execve_r(struct _reent *<[ptr]>, const char *<[name]>,
+                      char *const <[argv]>[], char *const <[env]>[]);
+
+DESCRIPTION
+	This is a reentrant version of <<execve>>.  It
+	takes a pointer to the global data block, which holds
+	<<errno>>.
+*/
+
+int
+_execve_r (struct _reent *ptr,
+     const char *name,
+     char *const argv[],
+     char *const env[])
+{
+  int ret;
+
+  errno = 0;
+  if ((ret = _execve (name, argv, env)) == -1 && errno != 0)
+    ptr->_errno = errno;
+  return ret;
+}
+
+
+/*
+NEWPAGE
 FUNCTION
 	<<_fork_r>>---Reentrant version of fork
 	
 INDEX
 	_fork_r
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <reent.h>
 	int _fork_r(struct _reent *<[ptr]>);
-
-TRAD_SYNOPSIS
-	#include <reent.h>
-	int _fork_r(<[ptr]>)
-	struct _reent *<[ptr]>;
 
 DESCRIPTION
 	This is a reentrant version of <<fork>>.  It
@@ -48,35 +77,32 @@ DESCRIPTION
 	<<errno>>.
 */
 
+#ifndef NO_FORK
+
 int
-_fork_r (ptr)
-     struct _reent *ptr;
+_fork_r (struct _reent *ptr)
 {
   int ret;
 
   errno = 0;
-  ret = _fork ();
-  if (errno != 0)
+  if ((ret = _fork ()) == -1 && errno != 0)
     ptr->_errno = errno;
   return ret;
 }
 
+#endif
+
 /*
+NEWPAGE
 FUNCTION
 	<<_wait_r>>---Reentrant version of wait
 	
 INDEX
 	_wait_r
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <reent.h>
 	int _wait_r(struct _reent *<[ptr]>, int *<[status]>);
-
-TRAD_SYNOPSIS
-	#include <reent.h>
-	int _wait_r(<[ptr]>, <[status]>)
-	struct _reent *<[ptr]>;
-	int *<[status]>;
 
 DESCRIPTION
 	This is a reentrant version of <<wait>>.  It
@@ -85,15 +111,13 @@ DESCRIPTION
 */
 
 int
-_wait_r (ptr, status)
-     struct _reent *ptr;
-     int *status;
+_wait_r (struct _reent *ptr,
+     int *status)
 {
   int ret;
 
   errno = 0;
-  ret = _wait (status);
-  if (errno != 0)
+  if ((ret = _wait (status)) == -1 && errno != 0)
     ptr->_errno = errno;
   return ret;
 }

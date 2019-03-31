@@ -1,7 +1,7 @@
 /* No user fns here. Pesch 15apr92. */
 
 /*
- * Copyright (c) 1990 The Regents of the University of California.
+ * Copyright (c) 1990, 2007 The Regents of the University of California.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -17,23 +17,25 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#include <_ansi.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include "local.h"
 
 /*
  * Various output routines call wsetup to be sure it is safe to write,
  * because either _flags does not include __SWR, or _buf is NULL.
- * _wsetup returns 0 if OK to write, nonzero otherwise.
+ * _wsetup returns 0 if OK to write, nonzero and set errno otherwise.
  */
 
 int
-_DEFUN (__swsetup, (fp),
-	register FILE * fp)
+__swsetup_r (struct _reent *ptr,
+       register FILE * fp)
 {
   /* Make sure stdio is set up.  */
 
-  CHECK_INIT (fp);
+  CHECK_INIT (_REENT, fp);
 
   /*
    * If we are not writing, we had better be reading and writing.
@@ -42,12 +44,16 @@ _DEFUN (__swsetup, (fp),
   if ((fp->_flags & __SWR) == 0)
     {
       if ((fp->_flags & __SRW) == 0)
-	return EOF;
+        {
+	  ptr->_errno = EBADF;
+	  fp->_flags |= __SERR;
+	  return EOF;
+        }
       if (fp->_flags & __SRD)
 	{
 	  /* clobber any ungetc data */
 	  if (HASUB (fp))
-	    FREEUB (fp);
+	    FREEUB (ptr, fp);
 	  fp->_flags &= ~(__SRD | __SEOF);
 	  fp->_r = 0;
 	  fp->_p = fp->_bf._base;
@@ -57,10 +63,12 @@ _DEFUN (__swsetup, (fp),
 
   /*
    * Make a buffer if necessary, then set _w.
+   * A string I/O file should not explicitly allocate a buffer
+   * unless asprintf is being used.
    */
-  /* NOT NEEDED FOR CYGNUS SPRINTF ONLY jpg */
-  if (fp->_bf._base == NULL)
-    __smakebuf (fp);
+  if (fp->_bf._base == NULL
+        && (!(fp->_flags & __SSTR) || (fp->_flags & __SMBF)))
+    __smakebuf_r (ptr, fp);
 
   if (fp->_flags & __SLBF)
     {
@@ -75,5 +83,11 @@ _DEFUN (__swsetup, (fp),
   else
     fp->_w = fp->_flags & __SNBF ? 0 : fp->_bf._size;
 
+  if (!fp->_bf._base && (fp->_flags & __SMBF))
+    {
+      /* __smakebuf_r set errno, but not flag */
+      fp->_flags |= __SERR;
+      return EOF;
+    }
   return 0;
 }

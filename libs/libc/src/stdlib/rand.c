@@ -7,32 +7,13 @@ INDEX
 INDEX
 	srand
 INDEX
-	_rand_r
-INDEX
-	_srand_r
+	rand_r
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <stdlib.h>
 	int rand(void);
 	void srand(unsigned int <[seed]>);
-
-	int _rand_r(void *<[reent]>);
-	void _srand_r(void *<[reent]>, unsigned int <[seed]>);
-
-TRAD_SYNOPSIS
-	#include <stdlib.h>
-	int rand();
-
-	void srand(<[seed]>)
-	unsigned int <[seed]>;
-
-	int _rand_r(<[reent]>);
-	char *<[reent]>
-
-	void _srand_r(<[data]>,<[seed]>)
-	char *<[reent]>;
-	unsigned int <[seed]>;
-
+	int rand_r(unsigned int *<[seed]>);
 
 DESCRIPTION
 <<rand>> returns a different integer each time it is called; each
@@ -52,15 +33,16 @@ beginning a sequence of calls to <<rand>>; or, if you wish to ensure
 use the same ``random'' numbers, you can use <<srand>> to set the same
 random seed at the outset.
 
-<<_rand_r>> and <<_srand_r>> are reentrant versions of <<rand>> and
-<<srand>>.  The extra argument <[reent]> is a pointer to a reentrancy
-structure.
-
 RETURNS
 <<rand>> returns the next pseudo-random integer in sequence; it is a
 number between <<0>> and <<RAND_MAX>> (inclusive).
 
 <<srand>> does not return a result.
+
+NOTES
+<<rand>> and <<srand>> are unsafe for multi-threaded applications.
+<<rand_r>> is thread-safe and should be used instead.
+
 
 PORTABILITY
 <<rand>> is required by ANSI, but the algorithm for pseudo-random
@@ -71,38 +53,32 @@ on two different systems.
 <<rand>> requires no supporting OS subroutines.
 */
 
+#ifndef _REENT_ONLY
+
 #include <stdlib.h>
 #include <reent.h>
 
-int
-_DEFUN (_rand_r, (ptr),
-	struct _reent *ptr)
-{
-  ptr->_next = (ptr->_next * 1103515245) + 12345;
-  return ((ptr->_next >> 16) & 0x7fff);
-}
-
 void
-_DEFUN (_srand_r, (ptr, seed),
-	struct _reent *ptr _AND
-	unsigned int seed)
+srand (unsigned int seed)
 {
-  ptr->_next = seed;
-}
+  struct _reent *reent = _REENT;
 
-#ifndef _REENT_ONLY
+  _REENT_CHECK_RAND48(reent);
+  _REENT_RAND_NEXT(reent) = seed;
+}
 
 int
-_DEFUN_VOID (rand)
+rand (void)
 {
-  return _rand_r (_REENT);
+  struct _reent *reent = _REENT;
+
+  /* This multiplier was obtained from Knuth, D.E., "The Art of
+     Computer Programming," Vol 2, Seminumerical Algorithms, Third
+     Edition, Addison-Wesley, 1998, p. 106 (line 26) & p. 108 */
+  _REENT_CHECK_RAND48(reent);
+  _REENT_RAND_NEXT(reent) =
+     _REENT_RAND_NEXT(reent) * __extension__ 6364136223846793005LL + 1;
+  return (int)((_REENT_RAND_NEXT(reent) >> 32) & RAND_MAX);
 }
 
-void
-_DEFUN (srand, (seed),
-	unsigned int seed)
-{
-  _srand_r (_REENT, seed);
-}
-
-#endif
+#endif /* _REENT_ONLY */

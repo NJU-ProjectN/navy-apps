@@ -1,5 +1,3 @@
-/* No user fns here. Pesch 15apr92 */
-
 /*
  * Copyright (c) 1990 Regents of the University of California.
  * All rights reserved.
@@ -16,11 +14,12 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+/* No user fns here. Pesch 15apr92 */
 
+#include <_ansi.h>
 #include <stdio.h>
 #include <time.h>
 #include <fcntl.h>
-
 #include <errno.h>
 #include <sys/types.h>
 
@@ -31,10 +30,9 @@
  */
 
 int
-__sflags (ptr, mode, optr)
-     struct _reent *ptr;
-     register char *mode;
-     int *optr;
+__sflags (struct _reent *ptr,
+       register char *mode,
+       int *optr)
 {
   register int ret, m, o;
 
@@ -61,24 +59,40 @@ __sflags (ptr, mode, optr)
       ptr->_errno = EINVAL;
       return (0);
     }
-  if (mode[1] == '+' || mode[2] == '+')
+  while (*++mode)
     {
-      ret |= __SRW;
-      m = O_RDWR;
-    }
-  if (mode[1] == 'b' || mode[2] == 'b')
-    {
+      switch (*mode)
+	{
+	case '+':
+	  ret = (ret & ~(__SRD | __SWR)) | __SRW;
+	  m = (m & ~O_ACCMODE) | O_RDWR;
+	  break;
+	case 'b':
 #ifdef O_BINARY
-      m |= O_BINARY;
+	  m |= O_BINARY;
 #endif
-    }
-  else
-    {
-#ifdef O_TEXT
-      m |= O_TEXT;
+	  break;
+#ifdef __CYGWIN__
+	case 't':
+	  m |= O_TEXT;
+	  break;
 #endif
+#if defined (O_CLOEXEC) && defined (_GLIBC_EXTENSION)
+	case 'e':
+	  m |= O_CLOEXEC;
+	  break;
+#endif
+	case 'x':
+	  m |= O_EXCL;
+	  break;
+	default:
+	  break;
+	}
     }
-
+#if defined (O_TEXT) && !defined (__CYGWIN__)
+  if (!(m | O_BINARY))
+    m |= O_TEXT;
+#endif
   *optr = m | o;
   return ret;
 }

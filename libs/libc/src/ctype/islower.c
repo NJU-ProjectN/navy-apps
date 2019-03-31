@@ -1,33 +1,40 @@
-
 /*
 FUNCTION
-<<islower>>---lower-case character predicate
+	<<islower>>, <<islower_l>>---lowercase character predicate
 
 INDEX
-islower
+	islower
 
-ANSI_SYNOPSIS
-#include <ctype.h>
-int islower(int <[c]>);
+INDEX
+	islower_l
 
-TRAD_SYNOPSIS
-#include <ctype.h>
-int islower(<[c]>);
+SYNOPSIS
+	#include <ctype.h>
+	int islower(int <[c]>);
+
+	#include <ctype.h>
+	int islower_l(int <[c]>, locale_t <[locale]>);
 
 DESCRIPTION
-<<islower>> is a macro which classifies ASCII integer values by table
+<<islower>> is a macro which classifies singlebyte charset values by table
 lookup.  It is a predicate returning non-zero for minuscules
-(lower-case alphabetic characters), and 0 for other characters.
-It is defined only when <<isascii>>(<[c]>) is true or <[c]> is EOF.
+(lowercase alphabetic characters), and 0 for other characters.
+It is defined only if <[c]> is representable as an unsigned char or if
+<[c]> is EOF.
+
+<<islower_l>> is like <<islower>> but performs the check based on the
+locale specified by the locale object locale.  If <[locale]> is
+LC_GLOBAL_LOCALE or not a valid locale object, the behaviour is undefined.
 
 You can use a compiled subroutine instead of the macro definition by
-undefining the macro using `<<#undef islower>>'.
+undefining the macro using `<<#undef islower>>' or `<<#undef islower_l>>'.
 
 RETURNS
-<<islower>> returns non-zero if <[c]> is a lower case letter (<<a>>--<<z>>).
+<<islower>>, <<islower_l>> return non-zero if <[c]> is a lowercase letter.
 
 PORTABILITY
 <<islower>> is ANSI C.
+<<islower_l>> is POSIX-1.2008.
 
 No supporting OS subroutines are required.
 */
@@ -36,8 +43,7 @@ No supporting OS subroutines are required.
 
 #undef islower
 int
-_DEFUN(islower,(c),int c)
+islower (int c)
 {
-	return((_ctype_ + 1)[c] & _L);
+	return ((__CTYPE_PTR[c+1] & (_U|_L)) == _L);
 }
-

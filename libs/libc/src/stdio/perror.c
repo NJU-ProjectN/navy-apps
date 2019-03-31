@@ -1,4 +1,21 @@
 /*
+ * Copyright (c) 1990 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms are permitted
+ * provided that the above copyright notice and this paragraph are
+ * duplicated in all such forms and that any documentation,
+ * advertising materials, and other materials related to such
+ * distribution and use acknowledge that the software was developed
+ * by the University of California, Berkeley.  The name of the
+ * University may not be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ */
+
+/*
 FUNCTION
 <<perror>>---print an error message on standard error
 
@@ -7,20 +24,11 @@ INDEX
 INDEX
 	_perror_r
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <stdio.h>
 	void perror(char *<[prefix]>);
 
-	void _perror_r(void *<[reent]>, char *<[prefix]>);
-
-TRAD_SYNOPSIS
-	#include <stdio.h>
-	void perror(<[prefix]>)
-	char *<[prefix]>;
-
-	void _perror_r(<[reent]>, <[prefix]>)
-	char *<[reent]>;
-	char *<[prefix]>;
+	void _perror_r(struct _reent *<[reent]>, char *<[prefix]>);
 
 DESCRIPTION
 Use <<perror>> to print (on standard error) an error message
@@ -33,7 +41,6 @@ of the strings described for <<strerror>>.
 The alternate function <<_perror_r>> is a reentrant version.  The
 extra argument <[reent]> is a pointer to a reentrancy structure.
 
-
 RETURNS
 <<perror>> returns no result.
 
@@ -45,34 +52,60 @@ Supporting OS subroutines required: <<close>>, <<fstat>>, <<isatty>>,
 <<lseek>>, <<read>>, <<sbrk>>, <<write>>.
 */
 
-#include <stddef.h>
+#include <_ansi.h>
+#include <reent.h>
 #include <stdio.h>
 #include <string.h>
+#include "local.h"
+
+#define WRITE_STR(str) \
+{ \
+  const char *p = (str); \
+  size_t len = strlen (p); \
+  while (len) \
+    { \
+      ssize_t len1 = _write_r (ptr, fileno (fp), p, len); \
+      if (len1 < 0) \
+	break; \
+      len -= len1; \
+      p += len1; \
+    } \
+}
 
 void
-_DEFUN (_perror_r, (ptr, s),
-	struct _reent *ptr _AND
-	_CONST char *s)
+_perror_r (struct _reent *ptr,
+       const char *s)
 {
   char *error;
+  int dummy;
+  FILE *fp = _stderr_r (ptr);
 
+  CHECK_INIT (ptr, fp);
+
+  _newlib_flockfile_start(fp);
+  _fflush_r (ptr, fp);
   if (s != NULL && *s != '\0')
     {
-      fputs (s, _stderr_r (ptr));
-      fputs (": ", _stderr_r (ptr));
+      WRITE_STR (s);
+      WRITE_STR (": ");
     }
 
-  if ((error = strerror (ptr->_errno)) != NULL)
-    fputs (error, _stderr_r (ptr));
+  if ((error = _strerror_r (ptr, ptr->_errno, 1, &dummy)) != NULL)
+    WRITE_STR (error);
 
-  fputc ('\n', _stderr_r (ptr));
+#ifdef __SCLE
+  WRITE_STR ((fp->_flags & __SCLE) ? "\r\n" : "\n");
+#else
+  WRITE_STR ("\n");
+#endif
+  fp->_flags &= ~__SOFF;
+  _newlib_flockfile_end(fp);
 }
 
 #ifndef _REENT_ONLY
 
 void
-_DEFUN (perror, (s),
-	_CONST char *s)
+perror (const char *s)
 {
   _perror_r (_REENT, s);
 }

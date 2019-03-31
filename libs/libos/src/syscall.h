@@ -2,11 +2,11 @@
 #define __SYSCALL_H__
 
 enum {
-  SYS_none,
+  SYS_exit,
+  SYS_yield,
   SYS_open,
   SYS_read,
   SYS_write,
-  SYS_exit,
   SYS_kill,
   SYS_getpid,
   SYS_close,

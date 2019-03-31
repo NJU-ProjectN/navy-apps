@@ -1,149 +1,90 @@
 /*
 FUNCTION
-	<<strtok>>---get next token from a string
+	<<strtok>>, <<strtok_r>>, <<strsep>>---get next token from a string
 
 INDEX
 	strtok
 
 INDEX
-	_strtok_r
+	strtok_r
 
-ANSI_SYNOPSIS
+INDEX
+	strsep
+
+SYNOPSIS
 	#include <string.h>
-      	char *strtok(char *<[source]>, const char *<[delimiters]>)
-
-      	char *_strtok_r(void *<[reent]>, 
-                        const char *<[source]>, const char *<[delimiters]>)
-
-TRAD_SYNOPSIS
-	#include <string.h>
-	char *strtok(<[source]>, <[delimiters]>)
-	char *<[source]>;
-	char *<[delimiters]>;
-
-	char *_strtok_r(<[reent]>, <[source]>, <[delimiters]>)
-	char *<[reent]>;
-	char *<[source]>;
-	char *<[delimiters]>;
+      	char *strtok(char *restrict <[source]>,
+                     const char *restrict <[delimiters]>);
+      	char *strtok_r(char *restrict <[source]>,
+                       const char *restrict <[delimiters]>,
+                       char **<[lasts]>);
+	char *strsep(char **<[source_ptr]>, const char *<[delimiters]>);
 
 DESCRIPTION
-	A series of calls to <<strtok>> break the string starting at
-	<<*<[source]>>> into a sequence of tokens.  The tokens are
-	delimited from one another by characters from the string at
-	<<*<[delimiters]>>>, at the outset.
-	The first call to <<strtok>> normally has a string address as
-	the first argument; subsequent calls can use <<NULL>> as the
-	first argument, to continue searching the same string.  You
-	can continue searching a single string with different
-	delimiters by using a different delimiter string on each call.
+	The <<strtok>> function is used to isolate sequential tokens in a 
+	null-terminated string, <<*<[source]>>>. These tokens are delimited 
+	in the string by at least one of the characters in <<*<[delimiters]>>>.
+	The first time that <<strtok>> is called, <<*<[source]>>> should be
+	specified; subsequent calls, wishing to obtain further tokens from
+	the same string, should pass a null pointer instead.  The separator
+	string, <<*<[delimiters]>>>, must be supplied each time and may 
+	change between calls.
 
-	<<strtok>> begins by searching for any character not in the
-	<[delimiters]> string: the first such character is the
-	beginning of a token (and its address will be the result of
-	the <<strtok>> call). <<strtok>> then continues searching
-	until it finds another delimiter character; it replaces that
-	character by <<NULL>> and returns.  (If <<strtok>> comes to
-	the end of the <<*<[source]>>> string without finding any more
-	delimiters, the entire remainder of the string is treated as
-	the next token).
-	<<strtok>> starts its search at <<*<[source]>>>, unless you
-	pass <<NULL>> as the first argument;  if <[source]> is
-	<<NULL>>, <<strtok>> continues searching from the end of the
-	last search. Exploiting the <<NULL>> first argument leads to
-	non-reentrant code. You can easily circumvent this problem by
-	saving the last delimiter address in your application, and
-	always using it to pass a non-null <[source]> argument.
+	The <<strtok>> function returns a pointer to the beginning of each 
+	subsequent token in the string, after replacing the separator 
+	character itself with a null character.  When no more tokens remain, 
+	a null pointer is returned.
 
-	<<_strtok_r>> performs the same function as <<strtok>>, but
-	is reentrant.  The extra argument <[reent]> is a pointer to
-	a reentrancy structure.
+	The <<strtok_r>> function has the same behavior as <<strtok>>, except
+	a pointer to placeholder <<*<[lasts]>>> must be supplied by the caller.
+
+	The <<strsep>> function is similar in behavior to <<strtok>>, except
+	a pointer to the string pointer must be supplied <<<[source_ptr]>>> and
+	the function does not skip leading delimiters.  When the string starts
+	with a delimiter, the delimiter is changed to the null character and
+	the empty string is returned.  Like <<strtok_r>> and <<strtok>>, the
+	<<*<[source_ptr]>>> is updated to the next character following the
+	last delimiter found or NULL if the end of string is reached with
+	no more delimiters.
 
 RETURNS
-	<<strtok>> returns a pointer to the next token, or <<NULL>> if
-	no more tokens can be found.
+	<<strtok>>, <<strtok_r>>, and <<strsep>> all return a pointer to the 
+	next token, or <<NULL>> if no more tokens can be found.  For
+	<<strsep>>, a token may be the empty string.
+
+NOTES
+	<<strtok>> is unsafe for multi-threaded applications.  <<strtok_r>>
+	and <<strsep>> are thread-safe and should be used instead.
 
 PORTABILITY
 <<strtok>> is ANSI C.
+<<strtok_r>> is POSIX.
+<<strsep>> is a BSD extension.
 
-<<strtok>> requires no supporting OS subroutines.
+<<strtok>>, <<strtok_r>>, and <<strsep>> require no supporting OS subroutines.
 
 QUICKREF
 	strtok ansi impure
 */
 
+/* undef STRICT_ANSI so that strtok_r prototype will be defined */
+#undef  __STRICT_ANSI__
 #include <string.h>
+#include <stdlib.h>
+#include <_ansi.h>
 #include <reent.h>
-
-char *				/* NULL if no token left */
-_DEFUN (_strtok_r, (r, s, delim),
-	struct _reent *r _AND
-	char *s _AND
-	_CONST char *delim)
-{
-  char *scan;
-  char *tok;
-  _CONST char *dscan;
-
-  if (s == NULL && r->_scanpoint == NULL)
-    {
-      return NULL;
-    }
-  if (s != NULL)
-    scan = s;
-  else
-    scan = r->_scanpoint;
-
-  /*
-   * Scan leading delimiters.
-   */
-
-  for (; *scan != '\0'; scan++)
-    {
-      for (dscan = delim; *dscan != '\0'; dscan++)
-	{
-	  if (*scan == *dscan)
-	    break;
-	}
-
-      if (*dscan == '\0')
-	break;
-    }
-  if (*scan == '\0')
-    {
-      r->_scanpoint = NULL;
-      return NULL;
-    }
-
-  tok = scan;
-
-  /*
-   * Scan token.
-   */
-
-  for (; *scan != '\0'; scan++)
-    {
-      for (dscan = delim; *dscan != '\0';)	/* ++ moved down. */
-	if (*scan == *dscan++)
-	  {
-	    r->_scanpoint = scan + 1;
-	    *scan = '\0';
-	    return tok;
-	  }
-    }
-
-  /* Reached end of string. */
-  r->_scanpoint = NULL;
-  return tok;
-}
 
 #ifndef _REENT_ONLY
 
-char *
-_DEFUN (strtok, (s, delim),
-	char *s _AND
-	_CONST char *delim)
-{
-  return _strtok_r (_REENT, s, delim);
-}
+extern char *__strtok_r (char *, const char *, char **, int);
 
+char *
+strtok (register char *__restrict s,
+	register const char *__restrict delim)
+{
+	struct _reent *reent = _REENT;
+
+	_REENT_CHECK_MISC(reent);
+	return __strtok_r (s, delim, &(_REENT_STRTOK_LAST(reent)), 1);
+}
 #endif

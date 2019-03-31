@@ -1,5 +1,3 @@
-/* No user fns here.  Pesch 15apr92. */
-
 /*
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -16,14 +14,19 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+/* No user fns here.  Pesch 15apr92. */
 
+#include <_ansi.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <limits.h>
 #include "local.h"
 #include "fvwrite.h"
 
 #define	MIN(a, b) ((a) < (b) ? (a) : (b))
-#define	COPY(n)	  (void) memmove((void *) fp->_p, (void *) p, (size_t) (n))
+#define	COPY(n)	  (void) memmove ((void *) fp->_p, (void *) p, (size_t) (n))
 
 #define GETIOV(extra_work) \
   while (len == 0) \
@@ -42,14 +45,14 @@
  */
 
 int
-__sfvwrite (fp, uio)
-     register FILE *fp;
-     register struct __suio *uio;
+__sfvwrite_r (struct _reent *ptr,
+       register FILE *fp,
+       register struct __suio *uio)
 {
   register size_t len;
-  register _CONST char *p;
+  register const char *p = NULL;
   register struct __siov *iov;
-  register int w, s;
+  register _READ_WRITE_RETURN_TYPE w, s;
   char *nl;
   int nlknown, nldist;
 
@@ -57,20 +60,43 @@ __sfvwrite (fp, uio)
     return 0;
 
   /* make sure we can write */
-  if (cantwrite (fp))
+  if (cantwrite (ptr, fp))
     return EOF;
 
   iov = uio->uio_iov;
   len = 0;
+
+#ifdef __SCLE
+  if (fp->_flags & __SCLE) /* text mode */
+    {
+      do
+        {
+          GETIOV (;);
+          while (len > 0)
+            {
+              if (putc (*p, fp) == EOF)
+                return EOF;
+              p++;
+              len--;
+              uio->uio_resid--;
+            }
+        }
+      while (uio->uio_resid > 0);
+      return 0;
+    }
+#endif
+
   if (fp->_flags & __SNBF)
     {
       /*
-       * Unbuffered: write up to BUFSIZ bytes at a time.
+       * Unbuffered: Split buffer in the largest multiple of BUFSIZ < INT_MAX
+       * as some legacy code may expect int instead of size_t.
        */
       do
 	{
 	  GETIOV (;);
-	  w = (*fp->_write) (fp->_cookie, p, MIN (len, BUFSIZ));
+	  w = fp->_write (ptr, fp->_cookie, p,
+			  MIN (len, INT_MAX - INT_MAX % BUFSIZ));
 	  if (w <= 0)
 	    goto err;
 	  p += w;
@@ -89,7 +115,9 @@ __sfvwrite (fp, uio)
        * as fit, but pretend we wrote everything.  This makes
        * snprintf() return the number of bytes needed, rather
        * than the number used, and avoids its write function
-       * (so that the write function can be invalid).
+       * (so that the write function can be invalid).  If
+       * we are dealing with the asprintf routines, we will
+       * dynamically increase the buffer size as needed.
        */
       do
 	{
@@ -97,6 +125,53 @@ __sfvwrite (fp, uio)
 	  w = fp->_w;
 	  if (fp->_flags & __SSTR)
 	    {
+	      if (len >= w && fp->_flags & (__SMBF | __SOPT))
+		{ /* must be asprintf family */
+		  unsigned char *str;
+		  int curpos = (fp->_p - fp->_bf._base);
+		  /* Choose a geometric growth factor to avoid
+		     quadratic realloc behavior, but use a rate less
+		     than (1+sqrt(5))/2 to accomodate malloc
+		     overhead. asprintf EXPECTS us to overallocate, so
+		     that it can add a trailing \0 without
+		     reallocating.  The new allocation should thus be
+		     max(prev_size*1.5, curpos+len+1). */
+		  int newsize = fp->_bf._size * 3 / 2;
+		  if (newsize < curpos + len + 1)
+		    newsize = curpos + len + 1;
+		  if (fp->_flags & __SOPT)
+		    {
+		      /* asnprintf leaves original buffer alone.  */
+		      str = (unsigned char *)_malloc_r (ptr, newsize);
+		      if (!str)
+			{
+			  ptr->_errno = ENOMEM;
+			  goto err;
+			}
+		      memcpy (str, fp->_bf._base, curpos);
+		      fp->_flags = (fp->_flags & ~__SOPT) | __SMBF;
+		    }
+		  else
+		    {
+		      str = (unsigned char *)_realloc_r (ptr, fp->_bf._base,
+							 newsize);
+		      if (!str)
+			{
+			  /* Free buffer which is no longer used and clear
+			     __SMBF flag to avoid double free in fclose.  */
+			  _free_r (ptr, fp->_bf._base);
+			  fp->_flags &=  ~__SMBF;
+			  /* Ensure correct errno, even if free changed it.  */
+			  ptr->_errno = ENOMEM;
+			  goto err;
+			}
+		    }
+		  fp->_bf._base = str;
+		  fp->_p = str + curpos;
+		  fp->_bf._size = newsize;
+		  w = len;
+		  fp->_w = newsize - curpos;
+		}
 	      if (len < w)
 		w = len;
 	      COPY (w);		/* copy MIN(fp->_w,len), */
@@ -104,29 +179,23 @@ __sfvwrite (fp, uio)
 	      fp->_p += w;
 	      w = len;		/* but pretend copied all */
 	    }
-	  else if (fp->_p > fp->_bf._base && len > w)
+	  else if (fp->_p > fp->_bf._base || len < fp->_bf._size)
 	    {
-	      /* fill and flush */
+	      /* pass through the buffer */
+	      w = MIN (len, w);
 	      COPY (w);
-	      /* fp->_w -= w; *//* unneeded */
+	      fp->_w -= w;
 	      fp->_p += w;
-	      if (fflush (fp))
-		goto err;
-	    }
-	  else if (len >= (w = fp->_bf._size))
-	    {
-	      /* write directly */
-	      w = (*fp->_write) (fp->_cookie, p, w);
-	      if (w <= 0)
+	      if (fp->_w == 0 && _fflush_r (ptr, fp))
 		goto err;
 	    }
 	  else
 	    {
-	      /* fill and done */
-	      w = len;
-	      COPY (w);
-	      fp->_w -= w;
-	      fp->_p += w;
+	      /* write directly */
+	      w = ((int)MIN (len, INT_MAX)) / fp->_bf._size * fp->_bf._size;
+	      w = fp->_write (ptr, fp->_cookie, p, w);
+	      if (w <= 0)
+		goto err;
 	    }
 	  p += w;
 	  len -= w;
@@ -143,6 +212,7 @@ __sfvwrite (fp, uio)
        * that the amount to write is MIN(len,nldist).
        */
       nlknown = 0;
+      nldist = 0;
       do
 	{
 	  GETIOV (nlknown = 0);
@@ -159,12 +229,12 @@ __sfvwrite (fp, uio)
 	      COPY (w);
 	      /* fp->_w -= w; */
 	      fp->_p += w;
-	      if (fflush (fp))
+	      if (_fflush_r (ptr, fp))
 		goto err;
 	    }
 	  else if (s >= (w = fp->_bf._size))
 	    {
-	      w = (*fp->_write) (fp->_cookie, p, w);
+	      w = fp->_write (ptr, fp->_cookie, p, w);
 	      if (w <= 0)
 		goto err;
 	    }
@@ -178,7 +248,7 @@ __sfvwrite (fp, uio)
 	  if ((nldist -= w) == 0)
 	    {
 	      /* copied the newline: flush and forget */
-	      if (fflush (fp))
+	      if (_fflush_r (ptr, fp))
 		goto err;
 	      nlknown = 0;
 	    }

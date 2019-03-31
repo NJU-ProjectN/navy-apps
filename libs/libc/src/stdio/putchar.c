@@ -24,20 +24,11 @@ INDEX
 INDEX
 	_putchar_r
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <stdio.h>
 	int putchar(int <[ch]>);
 
-	int _putchar_r(void *<[reent]>, int <[ch]>);
-
-TRAD_SYNOPSIS
-	#include <stdio.h>
-	int putchar(<[ch]>)
-	int <[ch]>;
-
-	int _putchar_r(<[reent]>, <[ch]>)
-	char *<[reent]>;
-	int <[ch]>;
+	int _putchar_r(struct _reent *<[reent]>, int <[ch]>);
 
 DESCRIPTION
 <<putchar>> is a macro, defined in <<stdio.h>>.  <<putchar>>
@@ -65,30 +56,33 @@ static char sccsid[] = "%W% (Berkeley) %G%";
 #endif /* LIBC_SCCS and not lint */
 
 /*
- * A subroutine version of the macro putchar
+ * A subroutine version of the macro putchar.
  */
 
+#include <_ansi.h>
+#include <reent.h>
 #include <stdio.h>
+#include "local.h"
 
 #undef putchar
 
 int
-_putchar_r (ptr, c)
-     struct _reent *ptr;
-     int c;
+_putchar_r (struct _reent *ptr,
+       int c)
 {
-  return __sputc (c, _stdout_r (ptr));
+  _REENT_SMALL_CHECK_INIT (ptr);
+  return _putc_r (ptr, c, _stdout_r (ptr));
 }
 
 #ifndef _REENT_ONLY
 
 int
-putchar (c)
-     int c;
+putchar (int c)
 {
-  /* CHECK_INIT is (eventually) called by __swbuf.  */
+  struct _reent *reent = _REENT;
 
-  _putchar_r (_REENT, c);
+  _REENT_SMALL_CHECK_INIT (reent);
+  return _putc_r (reent, c, _stdout_r (reent));
 }
 
 #endif

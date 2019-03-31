@@ -5,16 +5,10 @@ FUNCTION
 INDEX
 	strxfrm
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <string.h>
-	size_t strxfrm(char *<[s1]>, const char *<[s2]>, size_t <[n]>);
-
-TRAD_SYNOPSIS
-	#include <string.h>
-	size_t strxfrm(<[s1]>, <[s2]>, <[n]>);
-	char *<[s1]>;
-	char *<[s2]>;
-	size_t <[n]>;
+	size_t strxfrm(char *restrict <[s1]>, const char *restrict <[s2]>,
+                       size_t <[n]>);
 
 DESCRIPTION
 	This function transforms the string pointed to by <[s2]> and
@@ -31,7 +25,8 @@ DESCRIPTION
 	copying takes place between objects that overlap, the behavior
 	is undefined.
 
-	With a C locale, this function just copies.
+	(NOT Cygwin:) The current implementation of <<strxfrm>> simply copies
+	the input and does not support any language-specific transformations.
 
 RETURNS
 	The <<strxfrm>> function returns the length of the transformed string
@@ -51,22 +46,23 @@ QUICKREF
 #include <string.h>
 
 size_t
-_DEFUN (strxfrm, (s1, s2, n),
-	char *s1 _AND
-	_CONST char *s2 _AND
+strxfrm (char *__restrict s1,
+	const char *__restrict s2,
 	size_t n)
 {
   size_t res;
   res = 0;
-  while (n-- > 0 && *s2)
+  while (n-- > 0)
     {
-      *s1++ = *s2++;
-      res++;
+      if ((*s1++ = *s2++) != '\0')
+        ++res;
+      else
+        return res;
     }
   while (*s2)
     {
-      s2++;
-      res++;
+      ++s2;
+      ++res;
     }
 
   return res;

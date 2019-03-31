@@ -2,7 +2,6 @@
  * tmpname.c
  * Original Author:	G. Haley
  */
-
 /*
 FUNCTION
 <<tmpnam>>, <<tempnam>>---name for a temporary file
@@ -16,30 +15,12 @@ INDEX
 INDEX
 	_tempnam_r
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <stdio.h>
 	char *tmpnam(char *<[s]>);
 	char *tempnam(char *<[dir]>, char *<[pfx]>);
-	char *_tmpnam_r(void *<[reent]>, char *<[s]>);
-	char *_tempnam_r(void *<[reent]>, char *<[dir]>, char *<[pfx]>);
-
-TRAD_SYNOPSIS
-	#include <stdio.h>
-	char *tmpnam(<[s]>)
-	char *<[s]>;
-
-	char *tempnam(<[dir]>, <[pfx]>)
-	char *<[dir]>;
-	char *<[pfx]>;
-
-	char *_tmpnam_r(<[reent]>, <[s]>)
-	char *<[reent]>;
-	char *<[s]>;
-
-	char *_tempnam_r(<[reent]>, <[dir]>, <[pfx]>)
-	char *<[reent]>;
-	char *<[dir]>;
-	char *<[pfx]>;
+	char *_tmpnam_r(struct _reent *<[reent]>, char *<[s]>);
+	char *_tempnam_r(struct _reent *<[reent]>, char *<[dir]>, char *<[pfx]>);
 
 DESCRIPTION
 Use either of these functions to generate a name for a temporary file.
@@ -93,23 +74,24 @@ The global pointer <<environ>> is also required.
 */
 
 #include <_ansi.h>
+#include <reent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <reent.h>
+#include <errno.h>
 
-/* Try to open the file specified, if it can be opened then try
-   another one.  */
+/* Try to open the file specified, if it can't be opened then try
+   another one.  Return nonzero if successful, otherwise zero.  */
 
-static void
-worker (ptr, result, part1, part2, part3, part4)
-     struct _reent *ptr;
-     char *result;
-     _CONST char *part1;
-     _CONST char *part2;
-     int part3;
-     int *part4;
+static int
+worker (struct _reent *ptr,
+       char *result,
+       const char *part1,
+       const char *part2,
+       int part3,
+       int *part4)
 {
   /*  Generate the filename and make sure that there isn't one called
       it already.  */
@@ -118,29 +100,34 @@ worker (ptr, result, part1, part2, part3, part4)
     {
       int t;
       _sprintf_r (ptr, result, "%s/%s%x.%x", part1, part2, part3, *part4);
+      (*part4)++;
       t = _open_r (ptr, result, O_RDONLY, 0);
       if (t == -1)
-	break;
-      (*part4)++;
+	{
+	  if (ptr->_errno == ENOSYS)
+	    {
+	      result[0] = '\0';
+	      return 0;
+	    }
+	  break;
+	}
       _close_r (ptr, t);
     }
+  return 1;
 }
 
 char *
-_DEFUN (_tmpnam_r, (p, s),
-	struct _reent *p _AND
-	char *s)
+_tmpnam_r (struct _reent *p,
+       char *s)
 {
   char *result;
   int pid;
 
   if (s == NULL)
     {
-      result = _malloc_r (p, L_tmpnam + 1);
-      /* ANSI says that a static buf must be used - so
-       if malloc fails, we have one. */
-      if (result == NULL)
-	result = p->_emergency;
+      /* ANSI states we must use an internal static buffer if s is NULL */
+      _REENT_CHECK_EMERGENCY(p);
+      result = _REENT_EMERGENCY(p);
     }
   else
     {
@@ -148,29 +135,35 @@ _DEFUN (_tmpnam_r, (p, s),
     }
   pid = _getpid_r (p);
 
-  worker (p, result, "/tmp/", "t", pid, &p->_inc);
+  if (worker (p, result, P_tmpdir, "t", pid, &p->_inc))
+    {
+      p->_inc++;
+      return result;
+    }
 
-  return result;
+  return NULL;
 }
 
 char *
-_DEFUN (_tempnam_r, (p, dir, pfx),
-	struct _reent *p _AND
-	char *dir _AND
-	char *pfx)
+_tempnam_r (struct _reent *p,
+       const char *dir,
+       const char *pfx)
 {
   char *filename;
   int length;
+  const char *prefix = (pfx) ? pfx : "";
   if (dir == NULL && (dir = getenv ("TMPDIR")) == NULL)
-    dir = "/tmp/";
+    dir = P_tmpdir;
 
-  length = strlen (dir) + strlen (pfx) + 10 + 1;	/* two 8 digit
-							   numbers + . / */
+  /* two 8 digit numbers + . / */
+  length = strlen (dir) + strlen (prefix) + (4 * sizeof (int)) + 2 + 1;
 
   filename = _malloc_r (p, length);
   if (filename)
     {
-      worker (p, filename, dir, pfx, _getpid_r (p) ^ (int) p, &p->_inc);
+      if (! worker (p, filename, dir, prefix,
+		    _getpid_r (p) ^ (int) (_POINTER_INT) p, &p->_inc))
+	return NULL;
     }
   return filename;
 }
@@ -178,16 +171,14 @@ _DEFUN (_tempnam_r, (p, dir, pfx),
 #ifndef _REENT_ONLY
 
 char *
-_DEFUN (tempnam, (dir, pfx),
-	char *dir _AND
-	char *pfx)
+tempnam (const char *dir,
+       const char *pfx)
 {
   return _tempnam_r (_REENT, dir, pfx);
 }
 
 char *
-_DEFUN (tmpnam, (s),
-	char *s)
+tmpnam (char *s)
 {
   return _tmpnam_r (_REENT, s);
 }

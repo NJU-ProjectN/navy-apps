@@ -1,13 +1,10 @@
 /* connector for getpid */
 
 #include <reent.h>
+#include <unistd.h>
 
 int
-getpid ()
+getpid (void)
 {
-#ifdef REENTRANT_SYSCALLS_PROVIDED
   return _getpid_r (_REENT);
-#else
-  return _getpid ();
-#endif
 }

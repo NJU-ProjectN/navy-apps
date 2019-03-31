@@ -16,28 +16,49 @@
  */
 
 /*
-
 FUNCTION
-        <<fgets>>---get character string from a file or stream
+<<fgets>>, <<fgets_unlocked>>---get character string from a file or stream
+
 INDEX
 	fgets
+INDEX
+	fgets_unlocked
+INDEX
+	_fgets_r
+INDEX
+	_fgets_unlocked_r
 
-ANSI_SYNOPSIS
+SYNOPSIS
         #include <stdio.h>
-	char *fgets(char *<[buf]>, int <[n]>, FILE *<[fp]>);
+	char *fgets(char *restrict <[buf]>, int <[n]>, FILE *restrict <[fp]>);
 
-TRAD_SYNOPSIS
-	#include <stdio.h>
-	char *fgets(<[buf]>,<[n]>,<[fp]>)
-        char *<[buf]>;
-	int <[n]>;
-	FILE *<[fp]>;
+	#define _GNU_SOURCE
+        #include <stdio.h>
+	char *fgets_unlocked(char *restrict <[buf]>, int <[n]>, FILE *restrict <[fp]>);
+
+        #include <stdio.h>
+	char *_fgets_r(struct _reent *<[ptr]>, char *restrict <[buf]>, int <[n]>, FILE *restrict <[fp]>);
+
+        #include <stdio.h>
+	char *_fgets_unlocked_r(struct _reent *<[ptr]>, char *restrict <[buf]>, int <[n]>, FILE *restrict <[fp]>);
 
 DESCRIPTION
 	Reads at most <[n-1]> characters from <[fp]> until a newline
 	is found. The characters including to the newline are stored
 	in <[buf]>. The buffer is terminated with a 0.
 
+	<<fgets_unlocked>> is a non-thread-safe version of <<fgets>>.
+	<<fgets_unlocked>> may only safely be used within a scope
+	protected by flockfile() (or ftrylockfile()) and funlockfile().  This
+	function may safely be used in a multi-threaded program if and only
+	if they are called while the invoking thread owns the (FILE *)
+	object, as is the case after a successful call to the flockfile() or
+	ftrylockfile() functions.  If threads are disabled, then
+	<<fgets_unlocked>> is equivalent to <<fgets>>.
+
+	The functions <<_fgets_r>> and <<_fgets_unlocked_r>> are simply
+	reentrant versions that are passed the additional reentrant structure
+	pointer argument: <[ptr]>.
 
 RETURNS
 	<<fgets>> returns the buffer passed to it, with the data
@@ -50,14 +71,21 @@ PORTABILITY
 	that <<fgets>> returns all of the data, while <<gets>> removes
 	the trailing newline (with no indication that it has done so.)
 
+	<<fgets_unlocked>> is a GNU extension.
+
 Supporting OS subroutines required: <<close>>, <<fstat>>, <<isatty>>,
 <<lseek>>, <<read>>, <<sbrk>>, <<write>>.
 */
 
+#include <_ansi.h>
 #include <stdio.h>
 #include <string.h>
+#include "local.h"
 
-extern int __srefill ();
+#ifdef __IMPL_UNLOCKED__
+#define _fgets_r _fgets_unlocked_r
+#define fgets fgets_unlocked
+#endif
 
 /*
  * Read at most n-1 characters from the given file.
@@ -66,10 +94,10 @@ extern int __srefill ();
  */
 
 char *
-_DEFUN (fgets, (buf, n, fp),
-	char *buf _AND
-	int n _AND
-	FILE * fp)
+_fgets_r (struct _reent * ptr,
+       char *__restrict buf,
+       int n,
+       FILE *__restrict fp)
 {
   size_t len;
   char *s;
@@ -79,6 +107,32 @@ _DEFUN (fgets, (buf, n, fp),
     return 0;
 
   s = buf;
+
+  CHECK_INIT(ptr, fp);
+
+  _newlib_flockfile_start (fp);
+#ifdef __SCLE
+  if (fp->_flags & __SCLE)
+    {
+      int c = 0;
+      /* Sorry, have to do it the slow way */
+      while (--n > 0 && (c = __sgetc_r (ptr, fp)) != EOF)
+	{
+	  *s++ = c;
+	  if (c == '\n')
+	    break;
+	}
+      if (c == EOF && s == buf)
+        {
+          _newlib_flockfile_exit (fp);
+          return NULL;
+        }
+      *s = 0;
+      _newlib_flockfile_exit (fp);
+      return buf;
+    }
+#endif
+
   n--;				/* leave space for NUL */
   do
     {
@@ -87,11 +141,14 @@ _DEFUN (fgets, (buf, n, fp),
        */
       if ((len = fp->_r) <= 0)
 	{
-	  if (__srefill (fp))
+	  if (__srefill_r (ptr, fp))
 	    {
 	      /* EOF: stop with partial or no line */
 	      if (s == buf)
-		return 0;
+                {
+                  _newlib_flockfile_exit (fp);
+                  return 0;
+                }
 	      break;
 	    }
 	  len = fp->_r;
@@ -106,22 +163,36 @@ _DEFUN (fgets, (buf, n, fp),
        */
       if (len > n)
 	len = n;
-      t = (unsigned char *) memchr ((_PTR) p, '\n', len);
+      t = (unsigned char *) memchr ((void *) p, '\n', len);
       if (t != 0)
 	{
 	  len = ++t - p;
 	  fp->_r -= len;
 	  fp->_p = t;
-	  (void) memcpy ((_PTR) s, (_PTR) p, len);
+	  (void) memcpy ((void *) s, (void *) p, len);
 	  s[len] = 0;
+          _newlib_flockfile_exit (fp);
 	  return (buf);
 	}
       fp->_r -= len;
       fp->_p += len;
-      (void) memcpy ((_PTR) s, (_PTR) p, len);
+      (void) memcpy ((void *) s, (void *) p, len);
       s += len;
     }
   while ((n -= len) != 0);
   *s = 0;
+  _newlib_flockfile_end (fp);
   return buf;
 }
+
+#ifndef _REENT_ONLY
+
+char *
+fgets (char *__restrict buf,
+       int n,
+       FILE *__restrict fp)
+{
+  return _fgets_r (_REENT, buf, n, fp);
+}
+
+#endif /* !_REENT_ONLY */

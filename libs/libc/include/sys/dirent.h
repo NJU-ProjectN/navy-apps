@@ -1,15 +1,38 @@
-/* <dirent.h> includes <sys/dirent.h>, which is this file.  On a
-   system which supports <dirent.h>, this file is overridden by
-   dirent.h in the libc/sys/.../sys directory.  On a system which does
-   not support <dirent.h>, we will get this file which tries to find
-   any other <dirent.h> which may be lurking around.  If there isn't
-   one, the user will get an error indicating that there is no
-   <dirent.h>.  */
+#ifndef _SYS_DIRENT_H
+# define _SYS_DIRENT_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include_next <dirent.h>
-#ifdef __cplusplus
-}
+/*
+ * This file was written to be compatible with the BSD directory
+ * routines, so it looks like it.  But it was written from scratch.
+ * Sean Eric Fagan, sef@Kithrup.COM
+ */
+
+typedef struct _dirdesc {
+	int	dd_fd;
+	long	dd_loc;
+	long	dd_size;
+	char	*dd_buf;
+	int	dd_len;
+	long	dd_seek;
+} DIR;
+
+# define __dirfd(dp)	((dp)->dd_fd)
+
+DIR *opendir (const char *);
+struct dirent *readdir (DIR *);
+int readdir_r (DIR *__restrict, struct dirent *__restrict,
+               struct dirent **__restrict);
+void rewinddir (DIR *);
+int closedir (DIR *);
+
+#include <sys/types.h>
+
+struct dirent {
+	long	d_ino;
+	off_t	d_off;
+	unsigned short	d_reclen;
+	/* we need better syntax for variable-sized arrays */
+	char	d_name[1];
+};
+
 #endif

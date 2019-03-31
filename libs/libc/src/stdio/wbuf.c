@@ -1,5 +1,3 @@
-/* No user fns here.  Pesch 15apr92. */
-
 /*
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -16,12 +14,15 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+/* No user fns here.  Pesch 15apr92. */
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "%W% (Berkeley) %G%";
 #endif /* LIBC_SCCS and not lint */
 
+#include <_ansi.h>
 #include <stdio.h>
+#include <errno.h>
 #include "local.h"
 #include "fvwrite.h"
 
@@ -32,15 +33,15 @@ static char sccsid[] = "%W% (Berkeley) %G%";
  */
 
 int
-__swbuf (c, fp)
-     register int c;
-     register FILE *fp;
+__swbuf_r (struct _reent *ptr,
+       register int c,
+       register FILE *fp)
 {
   register int n;
 
   /* Ensure stdio has been initialized.  */
 
-  CHECK_INIT (fp);
+  CHECK_INIT (ptr, fp);
 
   /*
    * In case we cannot write, or longjmp takes us out early,
@@ -51,9 +52,11 @@ __swbuf (c, fp)
    */
 
   fp->_w = fp->_lbfsize;
-  if (cantwrite (fp))
+  if (cantwrite (ptr, fp))
     return EOF;
   c = (unsigned char) c;
+
+  ORIENT (fp, -1);
 
   /*
    * If it is completely full, flush it out.  Then, in any case,
@@ -68,14 +71,24 @@ __swbuf (c, fp)
   n = fp->_p - fp->_bf._base;
   if (n >= fp->_bf._size)
     {
-      if (fflush (fp))
+      if (_fflush_r (ptr, fp))
 	return EOF;
       n = 0;
     }
   fp->_w--;
   *fp->_p++ = c;
   if (++n == fp->_bf._size || (fp->_flags & __SLBF && c == '\n'))
-    if (fflush (fp))
+    if (_fflush_r (ptr, fp))
       return EOF;
   return c;
+}
+
+/* This function isn't any longer declared in stdio.h, but it's
+   required for backward compatibility with applications built against
+   earlier dynamically built newlib libraries. */
+int
+__swbuf (register int c,
+       register FILE *fp)
+{
+  return __swbuf_r (_REENT, c, fp);
 }

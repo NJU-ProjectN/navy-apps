@@ -1,32 +1,28 @@
 /*
 FUNCTION
-	<<strtoul>>---string to unsigned long
+	<<strtoul>>, <<strtoul_l>>---string to unsigned long
 
 INDEX
 	strtoul
+
+INDEX
+	strtoul_l
+
 INDEX
 	_strtoul_r
 
-ANSI_SYNOPSIS
+SYNOPSIS
 	#include <stdlib.h>
-        unsigned long strtoul(const char *<[s]>, char **<[ptr]>,
-                              int <[base]>);
+        unsigned long strtoul(const char *restrict <[s]>,
+			      char **restrict <[ptr]>, int <[base]>);
 
-        unsigned long _strtoul_r(void *<[reent]>, const char *<[s]>,
-                              char **<[ptr]>, int <[base]>);
-
-TRAD_SYNOPSIS
 	#include <stdlib.h>
-        unsigned long strtoul(<[s]>, <[ptr]>, <[base]>)
-        char *<[s]>;
-        char **<[ptr]>;
-        int <[base]>;
+        unsigned long strtoul_l(const char *restrict <[s]>,
+				char **restrict <[ptr]>, int <[base]>,
+				locale_t <[locale]>);
 
-        unsigned long _strtoul_r(<[reent]>, <[s]>, <[ptr]>, <[base]>)
-	char *<[reent]>;
-        char *<[s]>;
-        char **<[ptr]>;
-        int <[base]>;
+        unsigned long _strtoul_r(void *<[reent]>, const char *restrict <[s]>,
+				 char **restrict <[ptr]>, int <[base]>);
 
 DESCRIPTION
 The function <<strtoul>> converts the string <<*<[s]>>> to
@@ -68,136 +64,156 @@ with a substring in acceptable form), no conversion
 is performed and the value of <[s]> is stored in <[ptr]> (if <[ptr]> is
 not <<NULL>>).
 
+<<strtoul_l>> is like <<strtoul>> but performs the conversion based on the
+locale specified by the locale object locale.  If <[locale]> is
+LC_GLOBAL_LOCALE or not a valid locale object, the behaviour is undefined.
+
 The alternate function <<_strtoul_r>> is a reentrant version.  The
 extra argument <[reent]> is a pointer to a reentrancy structure.
 
-
 RETURNS
-<<strtoul>> returns the converted value, if any. If no conversion was
-made, <<0>> is returned.
+<<strtoul>>, <<strtoul_l>> return the converted value, if any. If no
+conversion was made, <<0>> is returned.
 
-<<strtoul>> returns <<ULONG_MAX>> if the magnitude of the converted
-value is too large, and sets <<errno>> to <<ERANGE>>.
+<<strtoul>>, <<strtoul_l>> return <<ULONG_MAX>> if the magnitude of the
+converted value is too large, and sets <<errno>> to <<ERANGE>>.
 
 PORTABILITY
 <<strtoul>> is ANSI.
+<<strtoul_l>> is a GNU extension.
 
 <<strtoul>> requires no supporting OS subroutines.
 */
 
 /*
- * Andy Wilson, 2-Oct-89.
+ * Copyright (c) 1990 Regents of the University of California.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the University of
+ *	California, Berkeley and its contributors.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
 #include <_ansi.h>
+#include <limits.h>
+#include <ctype.h>
+#include <errno.h>
+#include <stdlib.h>
 #include <reent.h>
-#include "std.h"
+#include "../locale/setlocale.h"
+
+/*
+ * Convert a string to an unsigned long integer.
+ */
+static unsigned long
+_strtoul_l (struct _reent *rptr, const char *__restrict nptr,
+	    char **__restrict endptr, int base, locale_t loc)
+{
+	register const unsigned char *s = (const unsigned char *)nptr;
+	register unsigned long acc;
+	register int c;
+	register unsigned long cutoff;
+	register int neg = 0, any, cutlim;
+
+	/*
+	 * See strtol for comments as to the logic used.
+	 */
+	do {
+		c = *s++;
+	} while (isspace_l(c, loc));
+	if (c == '-') {
+		neg = 1;
+		c = *s++;
+	} else if (c == '+')
+		c = *s++;
+	if ((base == 0 || base == 16) &&
+	    c == '0' && (*s == 'x' || *s == 'X')) {
+		c = s[1];
+		s += 2;
+		base = 16;
+	}
+	if (base == 0)
+		base = c == '0' ? 8 : 10;
+	cutoff = (unsigned long)ULONG_MAX / (unsigned long)base;
+	cutlim = (unsigned long)ULONG_MAX % (unsigned long)base;
+	for (acc = 0, any = 0;; c = *s++) {
+		if (c >= '0' && c <= '9')
+			c -= '0';
+		else if (c >= 'A' && c <= 'Z')
+			c -= 'A' - 10;
+		else if (c >= 'a' && c <= 'z')
+			c -= 'a' - 10;
+		else
+			break;
+		if (c >= base)
+			break;
+               if (any < 0 || acc > cutoff || (acc == cutoff && c > cutlim))
+			any = -1;
+		else {
+			any = 1;
+			acc *= base;
+			acc += c;
+		}
+	}
+	if (any < 0) {
+		acc = ULONG_MAX;
+		rptr->_errno = ERANGE;
+	} else if (neg)
+		acc = -acc;
+	if (endptr != 0)
+		*endptr = (char *) (any ? (char *)s - 1 : nptr);
+	return (acc);
+}
 
 unsigned long
-_DEFUN (_strtoul_r, (rptr, s, ptr, base),
-	struct _reent *rptr _AND
-	_CONST char *s _AND
-	char **ptr _AND
+_strtoul_r (struct _reent *rptr,
+	const char *__restrict nptr,
+	char **__restrict endptr,
 	int base)
 {
-  unsigned long total = 0;
-  unsigned digit;
-  int radix;
-  _CONST char *start = s;
-  int did_conversion = 0;
-  int overflow = 0;
-  int minus = 0;
-  unsigned long maxdiv, maxrem;
-
-  if (s == NULL)
-    {
-      rptr->_errno = ERANGE;
-      if (!ptr)
-	*ptr = (char *) start;
-      return 0L;
-    }
-
-  while (Isspace (*s))
-    s++;
-
-  if (*s == '-')
-    {
-      s++;
-      minus = 1;
-    }
-  else if (*s == '+')
-    s++;
-
-  radix = base;
-  if (base == 0 || base == 16)
-    {
-      /*
-       * try to infer radix from the string (assume decimal).
-       * accept leading 0x or 0X for base 16.
-       */
-      if (*s == '0')
-	{
-	  did_conversion = 1;
-	  if (base == 0)
-	    radix = 8;		/* guess it's octal */
-	  s++;			/* (but check for hex) */
-	  if (*s == 'X' || *s == 'x')
-	    {
-	      did_conversion = 0;
-	      s++;
-	      radix = 16;
-	    }
-	}
-    }
-  if (radix == 0)
-    radix = 10;
-
-  maxdiv = ULONG_MAX / radix;
-  maxrem = ULONG_MAX % radix;
-
-  while ((digit = *s) != 0)
-    {
-      if (digit >= '0' && digit <= '9' && digit < ('0' + radix))
-	digit -= '0';
-      else if (radix > 10)
-	{
-	  if (digit >= 'a' && digit < ('a' + radix - 10))
-	    digit = digit - 'a' + 10;
-	  else if (digit >= 'A' && digit < ('A' + radix - 10))
-	    digit = digit - 'A' + 10;
-	  else
-	    break;
-	}
-      else
-	break;
-      did_conversion = 1;
-      if (total > maxdiv
-	  || (total == maxdiv && digit > maxrem))
-	overflow = 1;
-      total = (total * radix) + digit;
-      s++;
-    }
-  if (overflow)
-    {
-      rptr->_errno = ERANGE;
-      if (ptr != NULL)
-	*ptr = (char *) s;
-      return ULONG_MAX;
-    }
-  if (ptr != NULL)
-    *ptr = (char *) ((did_conversion) ? (char *) s : start);
-  return minus ? - total : total;
+  return _strtoul_l (rptr, nptr, endptr, base, __get_current_locale ());
 }
 
 #ifndef _REENT_ONLY
 
 unsigned long
-_DEFUN (strtoul, (s, ptr, base),
-	_CONST char *s _AND
-	char **ptr _AND
+strtoul_l (const char *__restrict s, char **__restrict ptr, int base,
+	   locale_t loc)
+{
+	return _strtoul_l (_REENT, s, ptr, base, loc);
+}
+
+unsigned long
+strtoul (const char *__restrict s,
+	char **__restrict ptr,
 	int base)
 {
-  return _strtoul_r (_REENT, s, ptr, base);
+	return _strtoul_l (_REENT, s, ptr, base, __get_current_locale ());
 }
 
 #endif
