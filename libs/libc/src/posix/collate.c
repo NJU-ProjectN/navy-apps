@@ -34,7 +34,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <sysexits.h>
+#include "sysexits.h"
 #include "un-namespace.h"
 
 #include "collate.h"

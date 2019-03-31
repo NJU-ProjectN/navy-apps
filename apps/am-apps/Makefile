@@ -13,4 +13,4 @@ $(APPS_ALL): %:
 	-$(MAKE) -C $@ ARCH=$(ISA)-navy
 
 clean:
-	$(foreach app, $(APPS_ALL), $(MAKE) -C ARCH=$(ISA)-navy clean ;)
+	$(foreach app, $(APPS_ALL), $(MAKE) -C $(app) ARCH=$(ISA)-navy clean ;)

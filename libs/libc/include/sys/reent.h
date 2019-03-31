@@ -677,7 +677,7 @@ struct _reent
 # endif
 
   /* signal info */
-  void (**(_sig_func))(int);
+  void (**_sig_func)(int);
 
   /* These are here last so that __FILE can grow without changing the offsets
      of the above members (on the off chance that future binary compatibility
@@ -811,7 +811,7 @@ extern __FILE __sf[3];
 #define __ATTRIBUTE_IMPURE_PTR__
 #endif
 
-extern struct _reent *_impure_ptr __ATTRIBUTE_IMPURE_PTR__;
+extern struct _reent *const _impure_ptr __ATTRIBUTE_IMPURE_PTR__;
 extern struct _reent *const _global_impure_ptr __ATTRIBUTE_IMPURE_PTR__;
 
 void _reclaim_reent (struct _reent *);

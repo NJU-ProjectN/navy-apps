@@ -206,11 +206,11 @@ static void display_menu(int n) {
   draw_text_row(buf, i);
   i ++;
 
-  sprintf(buf, "  <-  PageDown");
+  sprintf(buf, "  <-  Prev Page");
   draw_text_row(buf, i);
   i ++;
 
-  sprintf(buf, "  ->  PageUp");
+  sprintf(buf, "  ->  Next Page");
   draw_text_row(buf, i);
   i ++;
 

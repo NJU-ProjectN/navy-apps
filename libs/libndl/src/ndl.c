@@ -6,7 +6,7 @@
 
 static int has_nwm = 0;
 static uint32_t *canvas;
-static FILE *fbdev, *evtdev;
+static FILE *fbdev, *evtdev, *fbsyncdev;
 
 static void get_display_info();
 static int canvas_w, canvas_h, screen_w, screen_h, pad_x, pad_y;
@@ -38,6 +38,7 @@ int NDL_OpenDisplay(int w, int h) {
     pad_y = (screen_h - canvas_h) / 2;
     fbdev = fopen("/dev/fb", "w"); assert(fbdev);
     evtdev = fopen("/dev/events", "r"); assert(evtdev);
+    fbsyncdev = fopen("/dev/fbsync", "w"); assert(fbsyncdev);
   }
 }
 
@@ -76,6 +77,8 @@ int NDL_Render() {
       fwrite(&canvas[i * canvas_w], sizeof(uint32_t), canvas_w, fbdev);
     }
     fflush(fbdev);
+    putc(0, fbsyncdev);
+    fflush(fbsyncdev);
   }
 }
 
