@@ -6,30 +6,45 @@
 #include <time.h>
 #include "syscall.h"
 
-intptr_t _syscall_(intptr_t type, intptr_t a0, intptr_t a1, intptr_t a2){
-  intptr_t ret = -1;
 #if defined(__ISA_X86__)
-  asm volatile("int $0x80": "=a"(ret): "a"(type), "b"(a0), "c"(a1), "d"(a2));
+# define GPR_TYPE "eax"
+# define GPR_ARG0 "ebx"
+# define GPR_ARG1 "ecx"
+# define GPR_ARG2 "edx"
+# define SYSCALL  "int $0x80"
+# define RET_VAR  _type
 #elif defined(__ISA_MIPS32__)
-  asm volatile("move $a0, %1;"
-               "move $a1, %2;"
-               "move $a2, %3;"
-               "move $a3, %4;"
-               "syscall;"
-               "move %0, $v0": "=r"(ret) : "r"(type), "r"(a0), "r"(a1), "r"(a2): "a0", "a1", "a2", "a3", "v0");
+# define GPR_TYPE "v0"
+# define GPR_ARG0 "a0"
+# define GPR_ARG1 "a1"
+# define GPR_ARG2 "a2"
+# define SYSCALL  "syscall"
+# define RET_VAR  _type
 #elif defined(__ISA_RISCV32__)
-  asm volatile("mv a0, %1;"
-               "mv a1, %2;"
-               "mv a2, %3;"
-               "mv a3, %4;"
-               "ecall;"
-               "move %0, a0": "=r"(ret) : "r"(type), "r"(a0), "r"(a1), "r"(a2): "a0", "a1", "a2", "a3");
+# define GPR_TYPE "a7"
+# define GPR_ARG0 "a0"
+# define GPR_ARG1 "a1"
+# define GPR_ARG2 "a2"
+# define SYSCALL  "ecall"
+# define RET_VAR  _arg0
 #elif defined(__ISA_AM_NATIVE__)
-  asm volatile("call *0x100000": "=a"(ret): "a"(type), "S"(a0), "d"(a1), "c"(a2));
+# define GPR_TYPE "rax"
+# define GPR_ARG0 "rdi"
+# define GPR_ARG1 "rsi"
+# define GPR_ARG2 "rdx"
+# define SYSCALL  "call *0x100000"
+# define RET_VAR  _type
 #else
-#error _syscall_ is not implemented
+#error syscall is not supported
 #endif
-  return ret;
+
+intptr_t _syscall_(intptr_t type, intptr_t a0, intptr_t a1, intptr_t a2) {
+  register intptr_t _type asm (GPR_TYPE) = type;
+  register intptr_t _arg0 asm (GPR_ARG0) = a0;
+  register intptr_t _arg1 asm (GPR_ARG1) = a1;
+  register intptr_t _arg2 asm (GPR_ARG2) = a2;
+  asm volatile (SYSCALL : "=r" (RET_VAR) : "r"(_type), "r"(_arg0), "r"(_arg1),  "r"(_arg2));
+  return RET_VAR;
 }
 
 void _exit(int status) {
@@ -42,12 +57,12 @@ int _open(const char *path, int flags, mode_t mode) {
   return 0;
 }
 
-int _write(int fd, void *buf, size_t count){
+int _write(int fd, void *buf, size_t count) {
   _exit(SYS_write);
   return 0;
 }
 
-void *_sbrk(intptr_t increment){
+void *_sbrk(intptr_t increment) {
   return (void *)-1;
 }
 
