@@ -6,45 +6,46 @@
 #include <time.h>
 #include "syscall.h"
 
+// helper macros
+#define _concat(x, y) x ## y
+#define concat(x, y) _concat(x, y)
+#define _args(n, list) concat(_arg, n) list
+#define _arg0(a0, ...) a0
+#define _arg1(a0, a1, ...) a1
+#define _arg2(a0, a1, a2, ...) a2
+#define _arg3(a0, a1, a2, a3, ...) a3
+#define _arg4(a0, a1, a2, a3, a4, ...) a4
+#define _arg5(a0, a1, a2, a3, a4, a5, ...) a5
+
+// extract an arguments from the macro array
+#define SYSCALL  _args(0, ARGS_ARRAY)
+#define GPR1 _args(1, ARGS_ARRAY)
+#define GPR2 _args(2, ARGS_ARRAY)
+#define GPR3 _args(3, ARGS_ARRAY)
+#define GPR4 _args(4, ARGS_ARRAY)
+#define GPRx _args(5, ARGS_ARRAY)
+
+// ISA-depedent definitions
 #if defined(__ISA_X86__)
-# define GPR_TYPE "eax"
-# define GPR_ARG0 "ebx"
-# define GPR_ARG1 "ecx"
-# define GPR_ARG2 "edx"
-# define SYSCALL  "int $0x80"
-# define RET_VAR  _type
+# define ARGS_ARRAY ("int $0x80", "eax", "ebx", "ecx", "edx", "eax")
 #elif defined(__ISA_MIPS32__)
-# define GPR_TYPE "v0"
-# define GPR_ARG0 "a0"
-# define GPR_ARG1 "a1"
-# define GPR_ARG2 "a2"
-# define SYSCALL  "syscall"
-# define RET_VAR  _type
+# define ARGS_ARRAY ("syscall", "v0", "a0", "a1", "a2", "v0")
 #elif defined(__ISA_RISCV32__)
-# define GPR_TYPE "a7"
-# define GPR_ARG0 "a0"
-# define GPR_ARG1 "a1"
-# define GPR_ARG2 "a2"
-# define SYSCALL  "ecall"
-# define RET_VAR  _arg0
+# define ARGS_ARRAY ("ecall", "a7", "a0", "a1", "a2", "a0")
 #elif defined(__ISA_AM_NATIVE__)
-# define GPR_TYPE "rax"
-# define GPR_ARG0 "rdi"
-# define GPR_ARG1 "rsi"
-# define GPR_ARG2 "rdx"
-# define SYSCALL  "call *0x100000"
-# define RET_VAR  _type
+# define ARGS_ARRAY ("call *0x100000", "rax", "rdi", "rsi", "rdx", "rax")
 #else
 #error syscall is not supported
 #endif
 
 intptr_t _syscall_(intptr_t type, intptr_t a0, intptr_t a1, intptr_t a2) {
-  register intptr_t _type asm (GPR_TYPE) = type;
-  register intptr_t _arg0 asm (GPR_ARG0) = a0;
-  register intptr_t _arg1 asm (GPR_ARG1) = a1;
-  register intptr_t _arg2 asm (GPR_ARG2) = a2;
-  asm volatile (SYSCALL : "=r" (RET_VAR) : "r"(_type), "r"(_arg0), "r"(_arg1),  "r"(_arg2));
-  return RET_VAR;
+  register intptr_t _gpr1 asm (GPR1) = type;
+  register intptr_t _gpr2 asm (GPR2) = a0;
+  register intptr_t _gpr3 asm (GPR3) = a1;
+  register intptr_t _gpr4 asm (GPR4) = a2;
+  register intptr_t ret asm (GPRx);
+  asm volatile (SYSCALL : "=r" (ret) : "r"(_gpr1), "r"(_gpr2), "r"(_gpr3), "r"(_gpr4));
+  return ret;
 }
 
 void _exit(int status) {
