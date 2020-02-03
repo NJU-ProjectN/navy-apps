@@ -1,6 +1,6 @@
 include $(NAVY_HOME)/Makefile.check
 
-APPS = coremark dhrystone hello microbench slider typing litenes
+APPS = coremark dhrystone microbench slider typing litenes
 
 APPS_ALL = $(addprefix $(AM_HOME)/apps/, $(APPS)) $(addprefix $(AM_HOME)/tests/, $(TESTS))
 
