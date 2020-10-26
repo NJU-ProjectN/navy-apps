@@ -16,7 +16,6 @@
 #include <SDL_bdf.h>
 
 const char *font_fname = "/share/fonts/Courier-7.bdf";
-static int W = 0, H = 0;
 static BDF_Font *font;
 static SDL_Surface *screen = NULL;
 static SDL_Surface *logo_sf = NULL;
@@ -142,7 +141,7 @@ static void draw_text_row(char *s, int r) {
 
 static void display_menu(int n) {
   clear_display();
-  SDL_Rect rect = { .x = W - logo_sf->w, .y = 0 };
+  SDL_Rect rect = { .x = screen->w - logo_sf->w, .y = 0 };
   SDL_BlitSurface(logo_sf, NULL, screen, &rect);
   printf("Available applications:\n");
   char buf[80];
