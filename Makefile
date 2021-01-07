@@ -13,8 +13,8 @@ ifeq ($(MAKECMDGOALS),)
   .DEFAULT_GOAL = app
 endif
 
-### Override checks when `make clean/clean-all/html`
-ifeq ($(findstring $(MAKECMDGOALS),clean|clean-all|html),)
+### Override checks when `make clean/clean-all/html/init`
+ifeq ($(findstring $(MAKECMDGOALS),clean|clean-all|html|init),)
 
 ### Print build info message
 $(info # Building $(NAME)-$(MAKECMDGOALS) [$(ISA)])
