@@ -69,12 +69,16 @@ endif
 OBJS      = $(addprefix $(DST_DIR)/, $(addsuffix .o, $(basename $(SRCS))))
 LIBS     := $(sort $(LIBS)) # lazy evaluation ("=") causes infinite recursions
 LINKAGE   = $(OBJS) $(foreach l,$(LIBS),$(NAVY_HOME)/libs/$(l)/build/$(l)-$(ISA).a)
+
 ## 3. General Compilation Flags
 
+### Check whether Ccache exists to accelerate compilation
+CCACHE := $(if $(shell which ccache),ccache,)
+
 ### (Cross) compilers, e.g., mips-linux-gnu-g++
-AS        = $(CROSS_COMPILE)gcc
-CC        = $(CROSS_COMPILE)gcc
-CXX       = $(CROSS_COMPILE)g++
+AS        = $(CCACHE) $(CROSS_COMPILE)gcc
+CC        = $(CCACHE) $(CROSS_COMPILE)gcc
+CXX       = $(CCACHE) $(CROSS_COMPILE)g++
 LD        = $(CROSS_COMPILE)ld
 
 ### Compilation flags
