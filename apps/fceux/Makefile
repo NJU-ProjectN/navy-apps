@@ -6,6 +6,14 @@ else
   $(shell ln -sf -T $(FCEUX_PATH)/nes/rom $(NAVY_HOME)/fsimg/share/games/nes)
 endif
 
-$(MAKECMDGOALS) default:
+ifeq ($(findstring $(MAKECMDGOALS),clean|clean-all|html),)
+libam:
 	$(MAKE) -C $(NAVY_HOME)/libs/libam archive
+else
+libam: ;
+endif
+
+default $(MAKECMDGOALS): libam
 	AM_HOME=$(NAVY_HOME) LIBS=libam $(MAKE) -C $(FCEUX_PATH) $(MAKECMDGOALS)
+
+.PHONY: libam default $(MAKECMDGOALS)
