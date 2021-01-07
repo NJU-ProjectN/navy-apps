@@ -7,6 +7,10 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/mman.h>
+#ifdef __ISA_NATIVE__
+#include <sys/prctl.h>
+#include <signal.h>
+#endif
 
 void Window::draw_raw_px(int x, int y, uint32_t color) {
   if (x >= 0 && y >= 0 && x < w && y < h) {
@@ -71,6 +75,15 @@ Window::Window(WindowManager *wm, const char *cmd, const char * const *argv, con
 
     pid_t p = fork();
     if (p == 0) { // child
+#ifdef __ISA_NATIVE__
+      // install a parent death signal in the chlid
+      int r = prctl(PR_SET_PDEATHSIG, SIGTERM);
+      if (r == -1) {
+        perror("prctl error");
+        assert(0);
+      }
+#endif
+
       // FIXME: what if they are overlapped
       dup2(nwm_to_app[0], 3);
       dup2(app_to_nwm[1], 4);
