@@ -14,10 +14,10 @@ typedef struct SDL_RWops {
   size_t  (*write)(struct SDL_RWops *f, const void *buf, size_t size, size_t nmemb);
   int     (*close)(struct SDL_RWops *f);
   uint32_t type;
-  union {
-    struct { FILE *fp; } file;
-    struct { void *base; size_t size, pos; } mem;
-  };
+  FILE *fp;
+
+  // mem.base is only defined when type == RW_TYPE_MEM
+  struct { void *base; ssize_t size; } mem;
 } SDL_RWops;
 
 SDL_RWops* SDL_RWFromFile(const char *filename, const char *mode);

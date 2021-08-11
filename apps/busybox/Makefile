@@ -10,7 +10,6 @@ endif
 NAME = busybox
 include $(NAVY_HOME)/Makefile
 
-CROSS_COMPILE := $(CCACHE) $(CROSS_COMPILE)
 ifeq ($(ISA), native)
 CFLAGS += -I$(WORK_DIR)/include/native/
 else

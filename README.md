@@ -122,7 +122,7 @@ HEIGHT:480
 * `libam`: 通过Navy的运行时环境实现的AM API, 可以运行AM程序, 目前仅支持TRM和IOE
 * `libSDL_ttf`: 基于libminiSDL和[stb项目][stb]中的truetype字体解析器, 支持truetype字体的光栅化
 * `libSDL_image`: 基于libminiSDL和[stb项目][stb]中的图像解码器, 支持JPG, PNG, BMP, GIF的解码
-* `libSDL_mixer`: 基于libminiSDL和libvorbis, 支持同频同声道的多通道混声, 目前仅支持OGG格式
+* `libSDL_mixer`: 基于libminiSDL和libvorbis, 支持多通道混声, 目前仅支持OGG格式
 
 [stb]: https://github.com/nothings/stb
 
