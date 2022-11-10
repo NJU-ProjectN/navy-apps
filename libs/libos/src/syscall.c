@@ -1,6 +1,5 @@
 #include <unistd.h>
 #include <sys/stat.h>
-#include <setjmp.h>
 #include <sys/time.h>
 #include <assert.h>
 #include <time.h>
@@ -36,6 +35,8 @@
 # define ARGS_ARRAY ("call *0x100000", "rdi", "rsi", "rdx", "rcx", "rax")
 #elif defined(__ISA_X86_64__)
 # define ARGS_ARRAY ("int $0x80", "rdi", "rsi", "rdx", "rcx", "rax")
+#elif defined(__ISA_LOONGARCH32R__)
+# define ARGS_ARRAY ("syscall 0", "a7", "a0", "a1", "a2", "a0")
 #else
 #error _syscall_ is not implemented
 #endif
