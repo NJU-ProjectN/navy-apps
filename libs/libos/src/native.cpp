@@ -157,6 +157,10 @@ extern "C" int execve(const char *filename, char *const argv[], char *const envp
 
 FILE *fopen(const char *path, const char *mode) {
   char newpath[512];
+  if (glibc_fopen == NULL) {
+    glibc_fopen = (FILE*(*)(const char*, const char*))dlsym(RTLD_NEXT, "fopen");
+    assert(glibc_fopen != NULL);
+  }
   return glibc_fopen(redirect_path(newpath, path), mode);
 }
 
