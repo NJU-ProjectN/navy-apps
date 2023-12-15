@@ -14,6 +14,7 @@
 #include <SDL2/SDL.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <stdarg.h>
 
 //#define MODE_800x600
 
@@ -181,9 +182,23 @@ int open(const char *path, int flags, ...) {
   }
 }
 
+// wrapper for newlib snprintf. C99 snprintf returns the number of characters that
+// would have been written as if the size were unlimited (not counting the
+// terminating null character).
+static inline int
+__attribute__((format(printf, 3, 4)))
+snprintf0(char *buf, size_t count, const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  int n = vsnprintf(buf, count, fmt, ap);
+  va_end(ap);
+  if (n >= count) n = count - 1;
+  return n;
+}
+
 ssize_t read(int fd, void *buf, size_t count) {
   if (fd == dispinfo_fd) {
-    return snprintf((char *)buf, count, "WIDTH: %d\nHEIGHT: %d\n", disp_w, disp_h);
+    return snprintf0((char *)buf, count, "WIDTH: %d\nHEIGHT: %d\n", disp_w, disp_h);
   } else if (fd == evt_fd) {
     int has_key = 0;
     SDL_Event ev = {};
@@ -202,7 +217,7 @@ ssize_t read(int fd, void *buf, size_t count) {
 
       const char *name = NULL;
       _KEYS(COND);
-      if (name) return snprintf((char *)buf, count, "k%c %s\n", keydown ? 'd' : 'u', name);
+      if (name) return snprintf0((char *)buf, count, "k%c %s\n", keydown ? 'd' : 'u', name);
     }
     return 0;
   } else if (fd == sbctl_fd) {
@@ -210,7 +225,7 @@ ssize_t read(int fd, void *buf, size_t count) {
     int used;
     ioctl(sb_fifo[0], FIONREAD, &used);
     int free = pipe_size - used;
-    return snprintf((char *)buf, count, "%d", free);
+    return snprintf0((char *)buf, count, "%d", free);
   }
   return glibc_read(fd, buf, count);
 }
@@ -261,7 +276,7 @@ struct Init {
     assert(navyhome);
     sprintf(fsimg_path, "%s/fsimg", navyhome);
 
-    char newpath[512];
+    char newpath[sizeof fsimg_path + 4];
     get_fsimg_path(newpath, "/bin");
     setenv("PATH", newpath, 1); // overwrite the current PATH
 
