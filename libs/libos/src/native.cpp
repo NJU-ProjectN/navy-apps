@@ -183,6 +183,8 @@ int open(const char *path, int flags, ...) {
 
 ssize_t read(int fd, void *buf, size_t count) {
   if (fd == dispinfo_fd) {
+    // This does not strictly conform to `navy-apps/README.md`.
+    // But it should be enough for real usage. Modify it if necessary.
     return snprintf((char *)buf, count, "WIDTH: %d\nHEIGHT: %d\n", disp_w, disp_h);
   } else if (fd == evt_fd) {
     int has_key = 0;
