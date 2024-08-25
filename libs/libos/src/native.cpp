@@ -14,6 +14,8 @@
 #include <SDL2/SDL.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <pthread.h>
+#include <signal.h>
 
 //#define MODE_800x600
 
@@ -61,6 +63,8 @@ static inline void get_fsimg_path(char *newpath, const char *path) {
   if (scancode == SDL_SCANCODE_##k) name = #k;
 
 static void update_screen() {
+  // The following SDL functions should be called in the main thread.
+  // See https://github.com/libsdl-org/SDL/blob/288aea3b40faf882f26411e6a3fe06329bba2c05/include/SDL_render.h#L45
   SDL_UpdateTexture(texture, NULL, fb, disp_w * sizeof(Uint32));
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, texture, NULL, NULL);
@@ -72,14 +76,15 @@ static SDL_Event key_queue[KEY_QUEUE_LEN] = {};
 static int key_f = 0, key_r = 0;
 static SDL_mutex *key_queue_lock = NULL;
 
-static int event_thread(void *args) {
+static int handle_sdl_event() {
   SDL_Event event;
   while (1) {
     SDL_WaitEvent(&event);
 
     switch (event.type) {
-      case SDL_QUIT: exit(0); break;
+      case SDL_QUIT: return 0;
       case SDL_USEREVENT: update_screen(); break;
+      case SDL_USEREVENT + 1: return event.user.code;
       case SDL_KEYDOWN:
       case SDL_KEYUP:
         SDL_LockMutex(key_queue_lock);
@@ -114,7 +119,6 @@ static void open_display() {
   SDL_CreateWindowAndRenderer(disp_w * 2, disp_h * 2, 0, &window, &renderer);
 #endif
   SDL_SetWindowTitle(window, "Simulated Nanos Application");
-  SDL_CreateThread(event_thread, "event thread", nullptr);
   SDL_AddTimer(1000 / FPS, timer_handler, NULL);
   texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, disp_w, disp_h);
 
@@ -147,6 +151,75 @@ static const char* redirect_path(char *newpath, const char *path) {
     return newpath;
   }
   return path;
+}
+
+typedef struct {
+  int argc;
+  char **argv;
+  char **envp;
+} Mainargs;
+static uint8_t main_backup_byte = 0;
+extern "C" int main(int argc, char *argv[], char *envp[]);
+
+static void set_sigtrap_handler(void (*handler)(int, siginfo_t *, void *)) {
+  struct sigaction s;
+  memset(&s, 0, sizeof(s));
+  if (handler) {
+    s.sa_flags = SA_SIGINFO;
+    s.sa_sigaction = handler;
+  } else {
+    s.sa_flags = 0;
+    s.sa_handler = SIG_DFL;
+  }
+  int ret = sigaction(SIGTRAP, &s, NULL);
+  assert(ret == 0);
+}
+
+static void* app_thread_wrapper(void *arg) {
+  Mainargs *args = (Mainargs *)arg;
+  int ret = main(args->argc, args->argv, args->envp);
+
+  // pass the exit code to the main thread
+  SDL_Event event;
+  event.type = SDL_USEREVENT + 1;
+  event.user.code = ret;
+  SDL_PushEvent(&event);
+
+  return NULL;
+}
+
+static int main_thread(int argc, char *argv[], char *envp[]) {
+  uint8_t *p = (uint8_t *)(void *)main;
+  *p = main_backup_byte;
+  int ret = mprotect((void *)((uintptr_t)main & ~0xffful), 4096, PROT_READ | PROT_EXEC);
+  assert(ret == 0);
+
+  set_sigtrap_handler(NULL);
+
+  pthread_t tid;
+  Mainargs args = { .argc = argc, .argv = argv, .envp = envp };
+  // call the real main in the app thread
+  ret = pthread_create(&tid, NULL, app_thread_wrapper, &args);
+  assert(ret == 0);
+
+  // handle SDL events in the main thread
+  ret = handle_sdl_event();
+  pthread_kill(tid, SIGTERM);
+  return ret; // this will return to glibc
+}
+
+static void sigtrap_handler(int sig, siginfo_t *info, void *ucontext) {
+  ((ucontext_t *)ucontext)->uc_mcontext.gregs[REG_RIP] = (uintptr_t)main_thread;
+}
+
+static void hijack_main() {
+  int ret = mprotect((void *)((uintptr_t)main & ~0xffful), 4096, PROT_READ | PROT_WRITE | PROT_EXEC);
+  assert(ret == 0);
+  uint8_t *p = (uint8_t *)(void *)main;
+  main_backup_byte = *p;
+  *p = 0xcc;  // int3 instruction in x86
+
+  set_sigtrap_handler(sigtrap_handler);
 }
 
 extern "C" FILE *fopen(const char *path, const char *mode);
@@ -271,6 +344,7 @@ struct Init {
     if (!getenv("NWM_APP")) {
       open_display();
       open_event();
+      hijack_main();
     }
     open_audio();
   }

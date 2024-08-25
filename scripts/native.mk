@@ -1,4 +1,5 @@
 LD = $(CXX)
+LDFLAGS += $(WL)--export-dynamic-symbol=main
 
 ### Run an application with $(ISA)=native
 
