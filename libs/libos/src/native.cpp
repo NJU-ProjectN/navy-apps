@@ -18,13 +18,19 @@
 //#define MODE_800x600
 
 #define FPS 60
+#define WINDOW_W 800
+#define WINDOW_H 600
 #ifdef MODE_800x600
-const int disp_w = 800, disp_h = 600;
+const int disp_w = WINDOW_W, disp_h = WINDOW_H;
 #else
 const int disp_w = 400, disp_h = 300;
 #endif
 static int pipe_size = 0;
 #define FB_SIZE (disp_w * disp_h * sizeof(uint32_t))
+#define RMASK 0x00ff0000
+#define GMASK 0x0000ff00
+#define BMASK 0x000000ff
+#define AMASK 0x00000000
 
 static FILE *(*glibc_fopen)(const char *path, const char *mode) = NULL;
 static int (*glibc_open)(const char *path, int flags, ...) = NULL;
@@ -33,8 +39,7 @@ static ssize_t (*glibc_write)(int fd, const void *buf, size_t count) = NULL;
 static int (*glibc_execve)(const char *filename, char *const argv[], char *const envp[]) = NULL;
 
 static SDL_Window *window = NULL;
-static SDL_Renderer *renderer = NULL;
-static SDL_Texture *texture = NULL;
+static SDL_Surface *surface = NULL;
 static int dummy_fd = -1;
 static int dispinfo_fd = -1;
 static int fb_memfd = -1;
@@ -60,13 +65,6 @@ static inline void get_fsimg_path(char *newpath, const char *path) {
 #define COND(k) \
   if (scancode == SDL_SCANCODE_##k) name = #k;
 
-static void update_screen() {
-  SDL_UpdateTexture(texture, NULL, fb, disp_w * sizeof(Uint32));
-  SDL_RenderClear(renderer);
-  SDL_RenderCopy(renderer, texture, NULL, NULL);
-  SDL_RenderPresent(renderer);
-}
-
 #define KEY_QUEUE_LEN 64
 static SDL_Event key_queue[KEY_QUEUE_LEN] = {};
 static int key_f = 0, key_r = 0;
@@ -79,7 +77,6 @@ static int event_thread(void *args) {
 
     switch (event.type) {
       case SDL_QUIT: exit(0); break;
-      case SDL_USEREVENT: update_screen(); break;
       case SDL_KEYDOWN:
       case SDL_KEYUP:
         SDL_LockMutex(key_queue_lock);
@@ -93,10 +90,9 @@ static int event_thread(void *args) {
   return 0;
 }
 
-static uint32_t timer_handler(uint32_t interval, void *param) {
-  SDL_Event event;
-  event.type = SDL_USEREVENT;
-  SDL_PushEvent(&event);
+static Uint32 texture_sync(Uint32 interval, void *param) {
+  SDL_BlitScaled(surface, NULL, SDL_GetWindowSurface(window), NULL);
+  SDL_UpdateWindowSurface(window);
   return interval;
 }
 
@@ -107,17 +103,6 @@ static void audio_fill(void *userdata, uint8_t *stream, int len) {
 }
 
 static void open_display() {
-  SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_TIMER);
-#ifdef MODE_800x600
-  SDL_CreateWindowAndRenderer(disp_w, disp_h, 0, &window, &renderer);
-#else
-  SDL_CreateWindowAndRenderer(disp_w * 2, disp_h * 2, 0, &window, &renderer);
-#endif
-  SDL_SetWindowTitle(window, "Simulated Nanos Application");
-  SDL_CreateThread(event_thread, "event thread", nullptr);
-  SDL_AddTimer(1000 / FPS, timer_handler, NULL);
-  texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, disp_w, disp_h);
-
   fb_memfd = memfd_create("fb", 0);
   assert(fb_memfd != -1);
   int ret = ftruncate(fb_memfd, FB_SIZE);
@@ -126,6 +111,14 @@ static void open_display() {
   assert(fb != (void *)-1);
   memset(fb, 0, FB_SIZE);
   lseek(fb_memfd, 0, SEEK_SET);
+
+  SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_TIMER);
+  window = SDL_CreateWindow("Simulated Nanos Application",
+      SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_W, WINDOW_H, SDL_WINDOW_OPENGL);
+  surface = SDL_CreateRGBSurfaceFrom(fb, disp_w, disp_h, 32, disp_w * sizeof(uint32_t),
+      RMASK, GMASK, BMASK, AMASK);
+  SDL_CreateThread(event_thread, "event thread", nullptr);
+  SDL_AddTimer(1000 / FPS, texture_sync, NULL);
 }
 
 static void open_event() {
