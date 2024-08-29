@@ -16,18 +16,17 @@ const int N = 10;
 // slides path pattern (starts from 0)
 const char *path = "/share/slides/slides-%d.bmp";
 
-static SDL_Surface *slide = NULL;
+static SDL_Surface *screen = NULL;
 static int cur = 0;
 
 void render() {
-  if (slide) {
-    SDL_FreeSurface(slide);
-  }
   char fname[256];
   sprintf(fname, path, cur);
-  slide = SDL_LoadBMP(fname);
+  SDL_Surface *slide = SDL_LoadBMP(fname);
   assert(slide);
-  SDL_UpdateRect(slide, 0, 0, 0, 0);
+  SDL_BlitSurface(slide, NULL, screen, NULL);
+  SDL_UpdateRect(screen, 0, 0, 0, 0);
+  SDL_FreeSurface(slide);
 }
 
 void prev(int rep) {
@@ -46,7 +45,7 @@ void next(int rep) {
 
 int main() {
   SDL_Init(0);
-  SDL_Surface *screen = SDL_SetVideoMode(W, H, 32, SDL_HWSURFACE);
+  screen = SDL_SetVideoMode(W, H, 32, SDL_HWSURFACE);
 
   int rep = 0, g = 0;
 
