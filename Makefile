@@ -68,7 +68,7 @@ endif
 ### Files to be linked: object files (`.o`) and libraries (`.a`)
 OBJS      = $(addprefix $(DST_DIR)/, $(addsuffix .o, $(basename $(SRCS))))
 LIBS     := $(sort $(LIBS)) # lazy evaluation ("=") causes infinite recursions
-LINKAGE   = $(OBJS)  # library archives are added by LIB_TEMPLATE below
+LINKAGE  += $(OBJS)  # library archives are added by LIB_TEMPLATE below
 
 ## 3. General Compilation Flags
 
@@ -118,7 +118,7 @@ $(DST_DIR)/%.o: %.S
 
 # $(1): library name
 define LIB_TEMPLATE =
-$$(NAVY_HOME)/libs/$(1)/build/$(1)-$$(ISA).a:
+$$(NAVY_HOME)/libs/$(1)/build/$(1)-$$(ISA).a: force
 	@$$(MAKE) -s -C $$(NAVY_HOME)/libs/$(1) archive
 LINKAGE += $$(NAVY_HOME)/libs/$(1)/build/$(1)-$$(ISA).a
 endef
@@ -150,6 +150,10 @@ endif
 app: $(APP)
 archive: $(ARCHIVE)
 .PHONY: app archive
+
+### Force to rebuild a rule
+force:
+.PHONY: force
 
 ### Install an application to fsimg
 install: app
